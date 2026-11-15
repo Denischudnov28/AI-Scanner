@@ -29,6 +29,8 @@ jobs:
         run: flutter pub get
       - name: Analyze
         run: flutter analyze --no-fatal-infos
+      - name: Run widget tests
+        run: flutter test
 
   android-build:
     runs-on: ubuntu-latest
@@ -49,6 +51,12 @@ jobs:
         run: flutter pub get
       - name: Build Android APK
         run: flutter build apk --debug
+      - name: Upload Android debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-Scanner-Android-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
 
   ios-build:
     runs-on: macos-latest
@@ -69,3 +77,11 @@ jobs:
         run: flutter pub get
       - name: Build iOS simulator app
         run: flutter build ios --simulator --no-codesign
+      - name: Package iOS simulator app
+        run: ditto -c -k --sequesterRsrc --keepParent build/ios/iphonesimulator/Runner.app AI-Scanner-iOS-Simulator.zip
+      - name: Upload iOS simulator build
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-Scanner-iOS-Simulator
+          path: AI-Scanner-iOS-Simulator.zip
+          if-no-files-found: error
