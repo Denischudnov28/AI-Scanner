@@ -2,6 +2,12 @@ import 'package:ai_scanner/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+Future<void> pumpApp(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(800, 1200);
+  tester.view.devicePixelRatio = 1;
+  await pumpApp(tester);
+}
+
 Future<void> createDocument(WidgetTester tester, String name) async {
   await tester.tap(find.byTooltip('Создать документ'));
   await tester.pump(const Duration(milliseconds: 300));
@@ -12,12 +18,12 @@ Future<void> createDocument(WidgetTester tester, String name) async {
 
 void main() {
   testWidgets('AI Scanner opens with its app title', (tester) async {
-    await tester.pumpWidget(const AiScannerApp());
+    await pumpApp(tester);
     expect(find.text('AI Scanner'), findsOneWidget);
   });
 
   testWidgets('Settings can be opened from the home screen', (tester) async {
-    await tester.pumpWidget(const AiScannerApp());
+    await pumpApp(tester);
     await tester.tap(find.byTooltip('Настройки'));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Настройки и безопасность'), findsOneWidget);
@@ -25,7 +31,7 @@ void main() {
   });
 
   testWidgets('Document library shows a newly created document', (tester) async {
-    await tester.pumpWidget(const AiScannerApp());
+    await pumpApp(tester);
     await createDocument(tester, 'Договор аренды');
 
     await tester.tap(find.byTooltip('Мои документы'));
@@ -36,14 +42,14 @@ void main() {
   });
 
   testWidgets('A named document can be created', (tester) async {
-    await tester.pumpWidget(const AiScannerApp());
+    await pumpApp(tester);
     await createDocument(tester, 'Договор аренды');
     expect(find.text('Новый документ'), findsNothing);
   });
 
   testWidgets('A document can be renamed from the document library',
       (tester) async {
-    await tester.pumpWidget(const AiScannerApp());
+    await pumpApp(tester);
     await createDocument(tester, 'Старое название');
     await tester.tap(find.byTooltip('Мои документы'));
     await tester.pump(const Duration(milliseconds: 300));
@@ -63,7 +69,7 @@ void main() {
 
   testWidgets('Deleting a document requires confirmation and removes it',
       (tester) async {
-    await tester.pumpWidget(const AiScannerApp());
+    await pumpApp(tester);
     await createDocument(tester, 'Документ для удаления');
     await tester.tap(find.byTooltip('Мои документы'));
     await tester.pump(const Duration(milliseconds: 300));
