@@ -54,7 +54,9 @@ void main() {
     await tester.tap(find.byTooltip('Мои документы'));
     await tester.pump(const Duration(milliseconds: 300));
 
-    final renameButton = find.byTooltip('Переименовать документ');
+    final renameButton = find.byWidgetPredicate(
+      (widget) => widget is IconButton && widget.tooltip == 'Переименовать документ',
+    );
     await tester.ensureVisible(renameButton);
     await tester.tap(renameButton);
     await tester.pump(const Duration(milliseconds: 300));
@@ -74,7 +76,9 @@ void main() {
     await tester.tap(find.byTooltip('Мои документы'));
     await tester.pump(const Duration(milliseconds: 300));
 
-    final deleteButton = find.byTooltip('Удалить документ');
+    final deleteButton = find.byWidgetPredicate(
+      (widget) => widget is IconButton && widget.tooltip == 'Удалить документ',
+    );
     await tester.ensureVisible(deleteButton);
     await tester.tap(deleteButton);
     await tester.pump(const Duration(milliseconds: 300));
