@@ -58,7 +58,7 @@ void main() {
       (widget) => widget is IconButton && widget.tooltip == 'Переименовать документ',
     );
     tester.widget<IconButton>(renameButton).onPressed!.call();
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 400));
 
     await tester.enterText(find.byType(TextField).last, 'Новое название');
     await tester.tap(find.text('Сохранить'));
