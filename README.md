@@ -14,11 +14,11 @@ Privacy-first document scanner prototype for iPhone and Android.
 - Require Face ID / Touch ID or the device passcode before opening the local vault.
 - Hide document previews when the app becomes inactive and require re-authentication after it is backgrounded.
 - Remove stale OCR/PDF temporary files on the next app launch after an interrupted operation.
-- OCR uses native on-device frameworks (Apple Vision on iOS and ML Kit on Android); images are not uploaded to a cloud service by this feature.
+- OCR runs on-device: Apple Vision on iOS and Tesseract4Android with the bundled Russian model on Android. This OCR feature does not upload images to a cloud service.
 
 ## Important limitations
 
-- Russian OCR on Android is implemented with Tesseract4Android and the `rus` model bundled into the APK; it runs locally without a network request. iOS continues to use Apple Vision. OCR quality, memory use, and processing speed still need testing on physical devices and varied document photos.
+- Russian OCR on Android is implemented with Tesseract4Android and the `rus` model bundled into the APK; it runs locally without a network request. iOS uses Apple Vision's on-device text recognition. OCR quality, memory use, and processing speed still need testing on physical devices and varied document photos.
 - Automatic edge detection and perspective correction run on imported still images; live camera edge tracking, manual corner adjustment, and document-wide text search are not implemented yet.
 - App-switcher privacy masking and re-authentication on background/foreground transitions are implemented in Flutter lifecycle handling but still require real-device testing. iOS does not provide a general guarantee against screenshots taken while the app is actively visible.
 - OCR temporarily decrypts a page to an app temporary file; PDF export creates a readable PDF in temporary storage for sharing. These temporary files are not encrypted by the current prototype.
