@@ -9,12 +9,11 @@ Privacy-first document scanner prototype for iPhone and Android.
 - Detect document edges and correct perspective locally during photo import; if detection fails, preserve the original image.
 - Verify AES-GCM encryption, per-file nonce uniqueness, tamper detection, and malformed-key handling with unit tests.
 - Export pages to a PDF and share it.
-- Run on-device OCR on an individual page and copy the recognized text. Android uses the bundled Russian Tesseract model offline; iOS continues to use Apple Vision.
+- Run on-device OCR on an individual page and copy the recognized text. iOS uses Apple Vision; Android uses the bundled Russian Tesseract model offline.
 - Encrypt stored page images locally with AES-256-GCM; keep the encryption key in iOS Keychain / Android Keystore via secure storage.
 - Require Face ID / Touch ID or the device passcode before opening the local vault.
 - Hide document previews when the app becomes inactive and require re-authentication after it is backgrounded.
 - Remove stale OCR/PDF temporary files on the next app launch after an interrupted operation.
-- OCR runs on-device: Apple Vision on iOS and Tesseract4Android with the bundled Russian model on Android. This OCR feature does not upload images to a cloud service.
 
 ## Important limitations
 
