@@ -520,11 +520,11 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                                       ),
                                     ),
                                     const SizedBox(width: 9),
-                                    const Expanded(
+                                    Expanded(
                                       child: _statTile('100%', 'Локально'),
                                     ),
                                     const SizedBox(width: 9),
-                                    const Expanded(
+                                    Expanded(
                                       child: _statTile('AES-256', 'Шифрование'),
                                     ),
                                   ],
