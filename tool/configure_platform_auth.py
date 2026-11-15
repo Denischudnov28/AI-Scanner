@@ -65,22 +65,46 @@ for activity in (root / "android" / "app" / "src" / "main").rglob("MainActivity.
     activity.write_text(text)
 
 # Android Russian OCR: use Tesseract4Android locally, without a network service.
+# Flutter's generated settings.gradle.kts does not always declare
+# dependencyResolutionManagement; in that case add JitPack to the root
+# project's allprojects.repositories block instead.
+jitpack_added = False
 for settings in (root / "android" / "settings.gradle.kts", root / "android" / "settings.gradle"):
     if settings.exists():
         text = settings.read_text()
         marker = "dependencyResolutionManagement {"
         if marker in text and "https://jitpack.io" not in text:
             start = text.index(marker)
-            repo_start = text.index("repositories {", start)
-            insert_at = repo_start + len("repositories {")
-            if settings.name.endswith(".kts"):
-                repository = '\n            maven { url = uri("https://jitpack.io") }'
-            else:
-                repository = "\n            maven { url 'https://jitpack.io' }"
-            text = text[:insert_at] + repository + text[insert_at:]
-            settings.write_text(text)
-        elif "https://jitpack.io" not in text:
-            raise RuntimeError(f"Could not add JitPack to {settings}: dependencyResolutionManagement.repositories not found")
+            repo_marker = "repositories {"
+            repo_start = text.find(repo_marker, start)
+            if repo_start >= 0:
+                insert_at = repo_start + len(repo_marker)
+                if settings.name.endswith(".kts"):
+                    repository = '\\n            maven { url = uri("https://jitpack.io") }'
+                else:
+                    repository = "\\n            maven { url 'https://jitpack.io' }"
+                text = text[:insert_at] + repository + text[insert_at:]
+                settings.write_text(text)
+                jitpack_added = True
+                break
+
+if not jitpack_added:
+    root_gradle = root / "android" / "build.gradle.kts"
+    if root_gradle.exists():
+        text = root_gradle.read_text()
+        if "https://jitpack.io" not in text:
+            match = re.search(r"allprojects\\s*\\{\\s*repositories\\s*\\{", text)
+            if not match:
+                raise RuntimeError("Could not find allprojects.repositories in android/build.gradle.kts")
+            insert_at = match.end()
+            text = text[:insert_at] + '\\n        maven { url = uri("https://jitpack.io") }' + text[insert_at:]
+            root_gradle.write_text(text)
+            jitpack_added = True
+        else:
+            jitpack_added = True
+
+if not jitpack_added:
+    raise RuntimeError("Could not configure JitPack in generated Android Gradle files")
 
 app_gradle = root / "android" / "app" / "build.gradle.kts"
 if app_gradle.exists():
