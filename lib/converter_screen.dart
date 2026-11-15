@@ -4,9 +4,8 @@ import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:pdfx/pdfx.dart';
+import 'package:pdfx/pdfx.dart' as px;
 import 'package:share_plus/share_plus.dart';
 
 class ConverterScreen extends StatefulWidget {
@@ -62,7 +61,7 @@ class _ConverterScreenState extends State<ConverterScreen> {
   }
 
   Future<void> _imagesToPdf() async {
-    final selection = await FilePicker.platform.pickFiles(
+    final selection = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['jpg', 'jpeg', 'png'],
       allowMultiple: true,
@@ -125,7 +124,7 @@ class _ConverterScreenState extends State<ConverterScreen> {
     }
 
     await _run(() async {
-      final document = await PdfDocument.openData(bytes);
+      final document = await px.PdfDocument.openData(bytes);
       final outputFiles = <File>[];
       try {
         if (document.pagesCount > 100) {
@@ -144,7 +143,7 @@ class _ConverterScreenState extends State<ConverterScreen> {
             final rendered = await page.render(
               width: math.max(1.0, page.width * scale).round(),
               height: math.max(1.0, page.height * scale).round(),
-              format: PdfPageImageFormat.jpeg,
+              format: px.PdfPageImageFormat.jpeg,
               backgroundColor: '#FFFFFF',
             );
             if (rendered == null || rendered.bytes.isEmpty) {
