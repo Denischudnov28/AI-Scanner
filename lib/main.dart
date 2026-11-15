@@ -55,6 +55,17 @@ class _ScannerHomeState extends State<ScannerHome> {
     }
   }
 
+  Future<void> _removePage(int index) async {
+    if (_busy || index < 0 || index >= _pages.length) return;
+    final file = _pages[index];
+    try {
+      if (await file.exists()) await file.delete();
+      if (mounted) setState(() => _pages.removeAt(index));
+    } catch (e) {
+      _message('Не удалось удалить файл страницы: $e');
+    }
+  }
+
   Future<void> _recognizePage(File file) async {
     if (_busy) return;
     setState(() {
@@ -204,7 +215,7 @@ class _ScannerHomeState extends State<ScannerHome> {
                         tooltip: 'Удалить страницу',
                         onPressed: _busy
                             ? null
-                            : () => setState(() => _pages.removeAt(i)),
+                            : () => _removePage(i),
                         icon: const Icon(Icons.close, size: 18),
                       ),
                     ),
