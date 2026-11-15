@@ -327,9 +327,11 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
         '${dir.path}/AI_Scanner_${DateTime.now().millisecondsSinceEpoch}.pdf',
       );
       await exported.writeAsBytes(await doc.save(), flush: true);
-      await Share.shareXFiles(
-        [XFile(exported.path)],
-        text: 'Документ из AI Scanner',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(exported.path)],
+          text: 'Документ из AI Scanner',
+        ),
       );
     } catch (e) {
       _message('Не удалось создать PDF: $e');
