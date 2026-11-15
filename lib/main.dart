@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 import 'local_vault.dart';
+import 'vault_file_store.dart';
 
 void main() => runApp(const AiScannerApp());
 
@@ -37,6 +38,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
   final _picker = ImagePicker();
   final _ocr = FlutterNativeOcr();
   final _vault = LocalVault();
+  final _fileStore = VaultFileStore();
   final List<File> _pages = [];
   bool _vaultReady = false;
   String? _vaultError;
@@ -100,15 +102,10 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
       if (!mounted) return;
       final appDir = await getApplicationDocumentsDirectory();
       final folder = Directory('${appDir.path}/scans');
-      final savedPages = folder.existsSync()
-          ? await folder
-              .list()
-              .where((entity) =>
-                  entity is File && entity.path.endsWith('.aiscan'))
-              .cast<File>()
-              .toList()
-          : <File>[];
-      savedPages.sort((a, b) => a.path.compareTo(b.path));
+      // Ignore incomplete writes and remove abandoned staging files after a
+      // crash; only fully renamed .aiscan files are visible to the app.
+      await _fileStore.cleanupPendingFiles(folder);
+      final savedPages = await _fileStore.listPages(folder);
       if (!mounted) return;
       setState(() {
         _vaultReady = true;
@@ -186,10 +183,10 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
       final dir = await getApplicationDocumentsDirectory();
       final folder = Directory('${dir.path}/scans');
       await folder.create(recursive: true);
-      final target = File(
-        '${folder.path}/page_${DateTime.now().microsecondsSinceEpoch}.aiscan',
+      final target = await _fileStore.saveEncryptedPage(
+        folder,
+        encryptedBytes,
       );
-      await target.writeAsBytes(encryptedBytes, flush: true);
       if (mounted) setState(() => _pages.add(target));
     } catch (e) {
       _message('Не удалось добавить страницу: $e');
