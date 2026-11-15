@@ -361,9 +361,78 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+        backgroundColor: const Color(0xFFF3F5FA),
         appBar: AppBar(
-          title: const Text('AI Scanner'),
-          centerTitle: true,
+          backgroundColor: const Color(0xFFF3F5FA),
+          surfaceTintColor: Colors.transparent,
+          toolbarHeight: 82,
+          title: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF192F61),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: const Icon(
+                  Icons.document_scanner_outlined,
+                  color: Colors.white,
+                  size: 27,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'AI Scanner',
+                      style: TextStyle(
+                        color: Color(0xFF101828),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 20,
+                      ),
+                    ),
+                    Text(
+                      'Умный сканер документов',
+                      style: TextStyle(
+                        color: Color(0xFF667085),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_vaultReady)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 11,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDDF5E7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.verified_user, color: Color(0xFF168447), size: 16),
+                      SizedBox(width: 5),
+                      Text(
+                        'Защищено',
+                        style: TextStyle(
+                          color: Color(0xFF168447),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
         body: _appObscured
             ? const ColoredBox(
@@ -373,126 +442,253 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                 ),
               )
             : !_vaultReady
-            ? Center(
-                child: _vaultError == null
-                    ? const CircularProgressIndicator()
-                    : Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _vaultError ?? 'Защищённое хранилище заблокировано.',
-                              textAlign: TextAlign.center,
+                ? Center(
+                    child: _vaultError == null
+                        ? const CircularProgressIndicator()
+                        : Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _vaultError ?? 'Защищённое хранилище заблокировано.',
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 12),
+                                FilledButton.icon(
+                                  onPressed: _unlockVault,
+                                  icon: const Icon(Icons.lock_open),
+                                  label: const Text('Повторить разблокировку'),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 12),
-                            FilledButton.icon(
-                              onPressed: _unlockVault,
-                              icon: const Icon(Icons.lock_open),
-                              label: const Text('Повторить разблокировку'),
+                          ),
+                  )
+                : CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(22),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF1B356B), Color(0xFF102653)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(25),
                             ),
-                          ],
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Align(
+                                  alignment: Alignment.topRight,
+                                  child: Icon(
+                                    Icons.lock_outline,
+                                    color: Color(0xFFDCE7FF),
+                                    size: 22,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Все документы в одном месте',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 27,
+                                    height: 1.16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'Сканируйте, сохраняйте и управляйте документами. Ваши файлы остаются на устройстве.',
+                                  style: TextStyle(
+                                    color: Color(0xFFD7E1F5),
+                                    fontSize: 15,
+                                    height: 1.45,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _statTile(
+                                        '${_pages.length}',
+                                        'Страниц',
+                                      ),
+                                    ),
+                                    const SizedBox(width: 9),
+                                    const Expanded(
+                                      child: _statTile('100%', 'Локально'),
+                                    ),
+                                    const SizedBox(width: 9),
+                                    const Expanded(
+                                      child: _statTile('AES-256', 'Шифрование'),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-              )
-            : _pages.isEmpty
-            ? const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.document_scanner_outlined, size: 72),
-                    SizedBox(height: 16),
-                    Text(
-                      'Все документы в одном месте',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Отсканируйте или добавьте документ',
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      'Обработка выполняется на устройстве',
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              )
-            : GridView.builder(
-                padding: const EdgeInsets.all(12),
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                ),
-                itemCount: _pages.length,
-                itemBuilder: (context, i) => Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: FutureBuilder<Uint8List>(
-                        future: _readPage(_pages[i]),
-                        builder: (context, snapshot) {
-                          if (snapshot.hasError) {
-                            return const Center(
-                              child: Icon(Icons.broken_image_outlined),
-                            );
-                          }
-                          if (!snapshot.hasData) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
-                          }
-                          return Image.memory(
-                            snapshot.data!,
-                            fit: BoxFit.cover,
-                          );
-                        },
-                      ),
-                    ),
-                    Positioned(
-                      left: 6,
-                      top: 6,
-                      child: CircleAvatar(
-                        radius: 14,
-                        child: Text('${i + 1}'),
-                      ),
-                    ),
-                    Positioned(
-                      right: 4,
-                      top: 4,
-                      child: IconButton.filledTonal(
-                        tooltip: 'Удалить страницу',
-                        onPressed: _busy
-                            ? null
-                            : () => _removePage(i),
-                        icon: const Icon(Icons.close, size: 18),
-                      ),
-                    ),
-                    Positioned(
-                      left: 4,
-                      right: 4,
-                      bottom: 4,
-                      child: FilledButton.tonalIcon(
-                        onPressed:
-                            _busy ? null : () => _recognizePage(_pages[i]),
-                        icon: const Icon(Icons.text_snippet_outlined),
-                        label: const Text('Распознать текст'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+                      if (_pages.isEmpty)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 25,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(23),
+                              ),
+                              child: const Column(
+                                children: [
+                                  Icon(
+                                    Icons.note_add_outlined,
+                                    color: Color(0xFF315AA5),
+                                    size: 42,
+                                  ),
+                                  SizedBox(height: 12),
+                                  Text(
+                                    'Пока нет документов',
+                                    style: TextStyle(
+                                      color: Color(0xFF101828),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 19,
+                                    ),
+                                  ),
+                                  SizedBox(height: 7),
+                                  Text(
+                                    'Отсканируйте или добавьте первый документ',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Color(0xFF667085),
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  SizedBox(height: 6),
+                                  Text(
+                                    'Обработка выполняется на устройстве',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Color(0xFF8490A5),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (_pages.isNotEmpty)
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+                          sliver: SliverGrid(
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount:
+                                  MediaQuery.sizeOf(context).width > 650 ? 3 : 2,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                            ),
+                            delegate: SliverChildBuilderDelegate(
+                              (context, i) => Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: FutureBuilder<Uint8List>(
+                                      future: _readPage(_pages[i]),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.hasError) {
+                                          return const ColoredBox(
+                                            color: Colors.white,
+                                            child: Center(
+                                              child: Icon(Icons.broken_image_outlined),
+                                            ),
+                                          );
+                                        }
+                                        if (!snapshot.hasData) {
+                                          return const ColoredBox(
+                                            color: Colors.white,
+                                            child: Center(
+                                              child: CircularProgressIndicator(),
+                                            ),
+                                          );
+                                        }
+                                        return Image.memory(
+                                          snapshot.data!,
+                                          fit: BoxFit.cover,
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  Positioned(
+                                    left: 7,
+                                    top: 7,
+                                    child: CircleAvatar(
+                                      radius: 14,
+                                      backgroundColor: Colors.white,
+                                      child: Text(
+                                        '${i + 1}',
+                                        style: const TextStyle(
+                                          color: Color(0xFF1B356B),
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    right: 4,
+                                    top: 4,
+                                    child: IconButton.filledTonal(
+                                      tooltip: 'Удалить страницу',
+                                      onPressed: _busy ? null : () => _removePage(i),
+                                      icon: const Icon(Icons.close, size: 18),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    left: 4,
+                                    right: 4,
+                                    bottom: 4,
+                                    child: FilledButton.tonalIcon(
+                                      onPressed: _busy
+                                          ? null
+                                          : () => _recognizePage(_pages[i]),
+                                      icon: const Icon(
+                                        Icons.text_snippet_outlined,
+                                        size: 18,
+                                      ),
+                                      label: const Text(
+                                        'Распознать текст',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              childCount: _pages.length,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
         bottomNavigationBar: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF3F5FA),
+              border: Border(
+                top: BorderSide(color: Color(0xFFE2E7F0)),
+              ),
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -503,8 +699,16 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                         onPressed: _busy || !_vaultReady
                             ? null
                             : () => _addPage(ImageSource.camera),
-                        icon: const Icon(Icons.camera_alt),
+                        icon: const Icon(Icons.camera_alt_outlined),
                         label: const Text('Камера'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
+                          foregroundColor: const Color(0xFF244B91),
+                          side: const BorderSide(color: Color(0xFFC9D5EA)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -513,29 +717,82 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                         onPressed: _busy || !_vaultReady
                             ? null
                             : () => _addPage(ImageSource.gallery),
-                        icon: const Icon(Icons.photo_library),
+                        icon: const Icon(Icons.photo_library_outlined),
                         label: const Text('Галерея'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
+                          foregroundColor: const Color(0xFF244B91),
+                          side: const BorderSide(color: Color(0xFFC9D5EA)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 9),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed:
-                        _busy || !_vaultReady || _pages.isEmpty ? null : _exportPdf,
-                    icon: const Icon(Icons.picture_as_pdf),
+                    onPressed: _busy || !_vaultReady || _pages.isEmpty
+                        ? null
+                        : _exportPdf,
+                    icon: const Icon(Icons.picture_as_pdf_outlined),
                     label: Text(
                       _busy
                           ? (_busyLabel ?? 'Подождите…')
-                          : 'Экспорт в PDF (${_pages.length})',
+                          : 'Экспорт в PDF',
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF244B91),
+                      minimumSize: const Size.fromHeight(52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
           ),
+        ),
+      );
+
+  static Widget _statTile(String value, String label) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0x2FFFFFFF),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 19,
+                ),
+              ),
+            ),
+            const SizedBox(height: 5),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: Color(0xFFD7E1F5),
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ],
         ),
       );
 }
