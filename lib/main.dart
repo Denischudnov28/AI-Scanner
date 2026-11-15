@@ -357,6 +357,63 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
   }
 
 
+  Future<void> _movePageToDocument(File file) async {
+    if (_busy) return;
+    final fileName = file.uri.pathSegments.last;
+    final currentDocumentId = _pageDocumentIds[fileName];
+    final destinations = _documentTitles.entries
+        .where((entry) => entry.key != currentDocumentId)
+        .toList();
+    if (destinations.isEmpty) {
+      _message('Сначала создайте ещё один документ.');
+      return;
+    }
+
+    final destinationId = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Переместить страницу'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: destinations
+                .map((entry) => ListTile(
+                      leading: const Icon(Icons.folder_outlined),
+                      title: Text(entry.value),
+                      onTap: () => Navigator.pop(dialogContext, entry.key),
+                    ))
+                .toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Отмена'),
+          ),
+        ],
+      ),
+    );
+    if (destinationId == null || !mounted) return;
+
+    setState(() => _pageDocumentIds[fileName] = destinationId);
+    try {
+      await _persistDocumentIndex();
+      _message('Страница перемещена в «${_documentTitles[destinationId]}»');
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          if (currentDocumentId == null) {
+            _pageDocumentIds.remove(fileName);
+          } else {
+            _pageDocumentIds[fileName] = currentDocumentId;
+          }
+        });
+      }
+      _message('Не удалось переместить страницу: $e');
+    }
+  }
+
   Future<void> _renameDocument(String documentId) async {
     final controller = TextEditingController(
       text: _documentTitles[documentId] ?? '',
@@ -1189,6 +1246,22 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                                           color: Color(0xFF1B356B),
                                           fontWeight: FontWeight.w700,
                                         ),
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    right: 48,
+                                    top: 4,
+                                    child: IconButton.filledTonal(
+                                      tooltip: 'Переместить страницу',
+                                      onPressed: _busy
+                                          ? null
+                                          : () => _movePageToDocument(
+                                                _pages[_visiblePageIndexes[i]],
+                                              ),
+                                      icon: const Icon(
+                                        Icons.drive_file_move_outline,
+                                        size: 18,
                                       ),
                                     ),
                                   ),
