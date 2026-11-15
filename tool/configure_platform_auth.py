@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply native settings required by local_auth and the OCR plugin after flutter create."""
+"""Apply native settings required by OS-authenticated secure storage and OCR."""
 from pathlib import Path
 import plistlib
 import re
@@ -44,7 +44,32 @@ if manifest.exists():
         text = text.replace("<manifest", "<manifest", 1)
         close = text.find(">")
         text = text[: close + 1] + "\n    " + permission + text[close + 1 :]
+    # Secure-storage encryption keys are device-bound. Prevent Android from
+    # restoring encrypted preferences without the matching Keystore key.
+    application = re.search(r"<application\\b[^>]*>", text, flags=re.DOTALL)
+    if application:
+        tag = application.group(0)
+        if re.search(r"android:allowBackup\\s*=", tag):
+            tag = re.sub(
+                r'android:allowBackup\\s*=\\s*"[^"]*"',
+                'android:allowBackup="false"',
+                tag,
+            )
+        else:
+            tag = tag[:-1] + ' android:allowBackup="false">'
+        text = text[: application.start()] + tag + text[application.end() :]
     manifest.write_text(text)
+
+app_gradle = root / "android" / "app" / "build.gradle.kts"
+if app_gradle.exists():
+    text = app_gradle.read_text()
+    # Strict Android Keystore biometric enforcement requires API 28 or newer.
+    text = re.sub(
+        r"minSdk\\s*=\\s*flutter\\.minSdkVersion",
+        "minSdk = 28",
+        text,
+    )
+    app_gradle.write_text(text)
 
 for activity in (root / "android" / "app" / "src" / "main").rglob("MainActivity.kt"):
     text = activity.read_text()
