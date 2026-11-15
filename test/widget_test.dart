@@ -70,6 +70,14 @@ void main() {
     await tester.tap(find.text('Сохранить'));
     await tester.pump(const Duration(milliseconds: 300));
 
+    // Reopen the library to verify the persisted title rather than the
+    // bottom sheet's previously built list snapshot.
+    await tester.pageBack();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byTooltip('Мои документы'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
     expect(find.text('Новое название'), findsOneWidget);
     expect(find.text('Старое название'), findsNothing);
   });
@@ -94,6 +102,13 @@ void main() {
     expect(find.text('Удалить документ?'), findsOneWidget);
     await tester.tap(find.text('Удалить').last);
     await tester.pump(const Duration(milliseconds: 300));
+
+    // Reopen the library so the assertion observes the updated document index.
+    await tester.pageBack();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byTooltip('Мои документы'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
 
     expect(find.text('Документ для удаления'), findsNothing);
     expect(find.text('Документов пока нет'), findsOneWidget);
