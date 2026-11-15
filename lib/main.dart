@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_ocr/flutter_native_ocr.dart';
+import 'package:document_scan/document_scan.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:path_provider/path_provider.dart';
@@ -169,7 +170,20 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
     try {
       pickedImage = await _picker.pickImage(source: source, imageQuality: 92);
       if (pickedImage == null || !mounted) return;
-      final clearBytes = await File(pickedImage.path).readAsBytes();
+      final originalBytes = await File(pickedImage.path).readAsBytes();
+      // Detect the page edges and correct perspective locally. If detection
+      // cannot find a page, keep the original photo rather than losing it.
+      Uint8List clearBytes = originalBytes;
+      try {
+        final scanned = await DocumentScanner().scan(
+          ScanInput.file(pickedImage.path),
+        );
+        if (scanned != null && scanned.bytes.isNotEmpty) {
+          clearBytes = scanned.bytes;
+        }
+      } catch (_) {
+        _message('Не удалось автоматически выровнять документ. Сохранено исходное фото.');
+      }
       final encryptedBytes = await _vault.encrypt(clearBytes);
       final dir = await getApplicationDocumentsDirectory();
       final folder = Directory('${dir.path}/scans');
