@@ -13,6 +13,12 @@ if info.exists():
     data["NSFaceIDUsageDescription"] = (
         "AI Scanner uses Face ID or your device passcode to protect scanned documents."
     )
+    data["NSCameraUsageDescription"] = (
+        "AI Scanner uses the camera to capture document pages on your device."
+    )
+    data["NSPhotoLibraryUsageDescription"] = (
+        "AI Scanner accesses selected photos so you can import document pages."
+    )
     with info.open("wb") as stream:
         plistlib.dump(data, stream)
 
