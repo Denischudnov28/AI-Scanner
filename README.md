@@ -11,7 +11,7 @@ Privacy-first document scanner prototype for iPhone and Android.
 - Export pages to a PDF and share it.
 - Run on-device OCR on an individual page and copy the recognized text. iOS uses Apple Vision; Android uses the bundled Russian Tesseract model offline.
 - Encrypt stored page images locally with AES-256-GCM; protect the AES key itself with OS authentication: iOS Keychain access control (`userPresence`, Face ID / Touch ID or device passcode, Secure Enclave-backed protection where available) and Android Keystore biometric storage.
-- Require OS-level authentication when the protected vault key is read; clear the in-memory AES key when the app is backgrounded and require authentication again on the next unlock.
+- Require OS-level authentication when the protected vault key is read; drop the in-memory AES key reference when the app is backgrounded and require authentication again on the next unlock. Dart does not guarantee immediate zeroization of previously allocated memory.
 - Migrate the existing AES key to a new authentication-gated storage entry without changing the key; verify the protected copy before deleting the legacy copy. If authentication or verification fails, keep the legacy key and leave the vault locked.
 - Disable Android app backup so device-bound Keystore material is not restored without its matching key.
 - Hide document previews when the app becomes inactive and require re-authentication after it is backgrounded.
