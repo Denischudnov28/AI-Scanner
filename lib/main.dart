@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -40,6 +41,24 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
   final _vault = LocalVault();
   final _fileStore = VaultFileStore();
   final List<File> _pages = [];
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  final Map<String, String> _pageDocumentIds = {};
+  final Map<String, String> _documentTitles = {};
+  String? _activeDocumentId;
+
+  List<int> get _visiblePageIndexes => List<int>.generate(_pages.length, (i) => i)
+      .where((i) {
+        final fileName = _pages[i].uri.pathSegments.last;
+        final documentId = _pageDocumentIds[fileName];
+        final belongsToSelectedDocument = _activeDocumentId == null ||
+            documentId == _activeDocumentId;
+        final matchesSearch = 'страница ${i + 1} $fileName'
+            .toLowerCase()
+            .contains(_searchQuery.trim().toLowerCase());
+        return belongsToSelectedDocument && matchesSearch;
+      })
+      .toList();
   bool _vaultReady = false;
   String? _vaultError;
   bool _busy = false;
@@ -57,6 +76,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -106,6 +126,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
       // crash; only fully renamed .aiscan files are visible to the app.
       await _fileStore.cleanupPendingFiles(folder);
       final savedPages = await _fileStore.listPages(folder);
+      await _restoreDocumentIndex(folder, savedPages);
       if (!mounted) return;
       setState(() {
         _vaultReady = true;
@@ -125,6 +146,115 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
         });
       }
     }
+  }
+
+  Future<void> _restoreDocumentIndex(
+    Directory folder,
+    List<File> savedPages,
+  ) async {
+    final indexFile = File('${folder.path}/documents_index.json');
+    if (await indexFile.exists()) {
+      try {
+        final decoded = jsonDecode(await indexFile.readAsString()) as Map<String, dynamic>;
+        final titles = decoded['titles'] as Map<String, dynamic>? ?? {};
+        final assignments = decoded['pages'] as Map<String, dynamic>? ?? {};
+        _documentTitles
+          ..clear()
+          ..addAll(titles.map((key, value) => MapEntry(key, value.toString())));
+        _pageDocumentIds
+          ..clear()
+          ..addAll(assignments.map((key, value) => MapEntry(key, value.toString())));
+      } catch (_) {
+        _documentTitles.clear();
+        _pageDocumentIds.clear();
+      }
+    }
+    if (savedPages.isNotEmpty && _documentTitles.isEmpty) {
+      _documentTitles['legacy'] = 'Мои документы';
+    }
+    for (final page in savedPages) {
+      final name = page.uri.pathSegments.last;
+      if (!_pageDocumentIds.containsKey(name) ||
+          !_documentTitles.containsKey(_pageDocumentIds[name])) {
+        const fallbackId = 'legacy';
+        _documentTitles.putIfAbsent(fallbackId, () => 'Мои документы');
+        _pageDocumentIds[name] = fallbackId;
+      }
+    }
+    _activeDocumentId ??= _documentTitles.isEmpty ? null : _documentTitles.keys.first;
+    await _persistDocumentIndex(folder);
+  }
+
+  Future<void> _persistDocumentIndex([Directory? targetFolder]) async {
+    final folder = targetFolder ??
+        Directory('${(await getApplicationDocumentsDirectory()).path}/scans');
+    await folder.create(recursive: true);
+    final indexFile = File('${folder.path}/documents_index.json');
+    final pendingFile = File('${folder.path}/documents_index.pending');
+    final payload = jsonEncode({
+      'version': 1,
+      'titles': _documentTitles,
+      'pages': _pageDocumentIds,
+    });
+    await pendingFile.writeAsString(payload, flush: true);
+    await pendingFile.rename(indexFile.path);
+  }
+
+  Future<void> _createDocument() async {
+    final controller = TextEditingController();
+    final title = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Новый документ'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          maxLength: 60,
+          decoration: const InputDecoration(
+            labelText: 'Название документа',
+            hintText: 'Например, Договор аренды',
+          ),
+          onSubmitted: (value) => Navigator.pop(dialogContext, value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('Создать'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (title == null || title.trim().isEmpty || !mounted) return;
+    final id = DateTime.now().microsecondsSinceEpoch.toString();
+    setState(() {
+      _documentTitles[id] = title.trim();
+      _activeDocumentId = id;
+      _searchQuery = '';
+      _searchController.clear();
+    });
+    try {
+      await _persistDocumentIndex();
+    } catch (e) {
+      _message('Не удалось сохранить название документа: $e');
+    }
+  }
+
+  Future<String> _ensureActiveDocument() async {
+    if (_activeDocumentId != null &&
+        _documentTitles.containsKey(_activeDocumentId)) {
+      return _activeDocumentId!;
+    }
+    final id = DateTime.now().microsecondsSinceEpoch.toString();
+    _documentTitles[id] = 'Документ ${_documentTitles.length + 1}';
+    _activeDocumentId = id;
+    await _persistDocumentIndex();
+    return id;
   }
 
   Future<void> _cleanupTemporaryFiles() async {
@@ -187,6 +317,9 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
         folder,
         encryptedBytes,
       );
+      final documentId = await _ensureActiveDocument();
+      _pageDocumentIds[target.uri.pathSegments.last] = documentId;
+      await _persistDocumentIndex(folder);
       if (mounted) setState(() => _pages.add(target));
     } catch (e) {
       _message('Не удалось добавить страницу: $e');
@@ -215,10 +348,116 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
     final file = _pages[index];
     try {
       if (await file.exists()) await file.delete();
+      _pageDocumentIds.remove(file.uri.pathSegments.last);
+      await _persistDocumentIndex();
       if (mounted) setState(() => _pages.removeAt(index));
     } catch (e) {
       _message('Не удалось удалить файл страницы: $e');
     }
+  }
+
+  Future<void> _showPage(File file, int pageNumber) async {
+    try {
+      final bytes = await _readPage(file);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        barrierColor: Colors.black87,
+        builder: (dialogContext) => Dialog.fullscreen(
+          backgroundColor: const Color(0xFF101828),
+          child: Scaffold(
+            backgroundColor: const Color(0xFF101828),
+            appBar: AppBar(
+              backgroundColor: const Color(0xFF101828),
+              foregroundColor: Colors.white,
+              title: Text('Страница $pageNumber'),
+              actions: [
+                IconButton(
+                  tooltip: 'Распознать текст',
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                    _recognizePage(file);
+                  },
+                  icon: const Icon(Icons.text_snippet_outlined),
+                ),
+              ],
+            ),
+            body: Center(
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 5,
+                child: Image.memory(bytes, fit: BoxFit.contain),
+              ),
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      _message('Не удалось открыть страницу: $e');
+    }
+  }
+
+  void _showSettings() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Настройки и безопасность',
+                style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 18),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.lock_outline, color: Color(0xFF2457D6)),
+                title: const Text('Зашифрованное хранилище'),
+                subtitle: Text(_vaultReady
+                    ? 'Разблокировано на этом устройстве'
+                    : 'Сейчас заблокировано'),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.fingerprint, color: Color(0xFF2457D6)),
+                title: const Text('Защита устройства'),
+                subtitle: const Text(
+                  'Доступ к ключу шифрования защищён системной биометрией или кодом устройства.',
+                ),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.phonelink_lock, color: Color(0xFF2457D6)),
+                title: const Text('Локальная обработка'),
+                subtitle: const Text(
+                  'Сканирование и распознавание выполняются на устройстве. Облачная отправка не используется.',
+                ),
+              ),
+              const Divider(),
+              const ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.info_outline),
+                title: Text('AI Scanner'),
+                subtitle: Text('Предварительная версия'),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(sheetContext),
+                  child: const Text('Закрыть'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _recognizePage(File file) async {
@@ -300,7 +539,11 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
   }
 
   Future<void> _exportPdf() async {
-    if (_pages.isEmpty || _busy) return;
+    final exportPages = _activeDocumentId == null
+        ? _pages
+        : _pages.where((file) =>
+            _pageDocumentIds[file.uri.pathSegments.last] == _activeDocumentId).toList();
+    if (exportPages.isEmpty || _busy) return;
     File? exported;
     setState(() {
       _busy = true;
@@ -308,7 +551,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
     });
     try {
       final doc = pw.Document();
-      for (final file in _pages) {
+      for (final file in exportPages) {
         final bytes = await _readPage(file);
         final image = pw.MemoryImage(bytes);
         doc.addPage(
@@ -327,7 +570,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(exported.path)],
-          text: 'Документ из AI Scanner',
+          text: 'Документ «${_documentTitles[_activeDocumentId] ?? 'AI Scanner'}»',
         ),
       );
     } catch (e) {
@@ -361,9 +604,90 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+        backgroundColor: const Color(0xFFF3F5FA),
         appBar: AppBar(
-          title: const Text('AI Scanner'),
-          centerTitle: true,
+          backgroundColor: const Color(0xFFF3F5FA),
+          surfaceTintColor: Colors.transparent,
+          toolbarHeight: 82,
+          actions: [
+            IconButton(
+              tooltip: 'Создать документ',
+              onPressed: _busy ? null : _createDocument,
+              icon: const Icon(Icons.create_new_folder_outlined),
+            ),
+            IconButton(
+              tooltip: 'Настройки',
+              onPressed: _showSettings,
+              icon: const Icon(Icons.settings_outlined),
+            ),
+          ],
+          title: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF192F61),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: const Icon(
+                  Icons.document_scanner_outlined,
+                  color: Colors.white,
+                  size: 27,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'AI Scanner',
+                      style: TextStyle(
+                        color: Color(0xFF101828),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 20,
+                      ),
+                    ),
+                    Text(
+                      'Умный сканер документов',
+                      style: TextStyle(
+                        color: Color(0xFF667085),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_vaultReady)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 11,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDDF5E7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.verified_user, color: Color(0xFF168447), size: 16),
+                      SizedBox(width: 5),
+                      Text(
+                        'Защищено',
+                        style: TextStyle(
+                          color: Color(0xFF168447),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
         body: _appObscured
             ? const ColoredBox(
@@ -373,126 +697,349 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                 ),
               )
             : !_vaultReady
-            ? Center(
-                child: _vaultError == null
-                    ? const CircularProgressIndicator()
-                    : Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _vaultError ?? 'Защищённое хранилище заблокировано.',
-                              textAlign: TextAlign.center,
+                ? Center(
+                    child: _vaultError == null
+                        ? const CircularProgressIndicator()
+                        : Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _vaultError ?? 'Защищённое хранилище заблокировано.',
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 12),
+                                FilledButton.icon(
+                                  onPressed: _unlockVault,
+                                  icon: const Icon(Icons.lock_open),
+                                  label: const Text('Повторить разблокировку'),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 12),
-                            FilledButton.icon(
-                              onPressed: _unlockVault,
-                              icon: const Icon(Icons.lock_open),
-                              label: const Text('Повторить разблокировку'),
+                          ),
+                  )
+                : CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(22),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF1B356B), Color(0xFF102653)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(25),
                             ),
-                          ],
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Align(
+                                  alignment: Alignment.topRight,
+                                  child: Icon(
+                                    Icons.lock_outline,
+                                    color: Color(0xFFDCE7FF),
+                                    size: 22,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Все документы в одном месте',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 27,
+                                    height: 1.16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'Сканируйте, сохраняйте и управляйте документами. Ваши файлы остаются на устройстве.',
+                                  style: TextStyle(
+                                    color: Color(0xFFD7E1F5),
+                                    fontSize: 15,
+                                    height: 1.45,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _statTile(
+                                        '${_pages.length}',
+                                        'Страниц',
+                                      ),
+                                    ),
+                                    const SizedBox(width: 9),
+                                    Expanded(
+                                      child: _statTile('100%', 'Локально'),
+                                    ),
+                                    const SizedBox(width: 9),
+                                    Expanded(
+                                      child: _statTile('AES-256', 'Шифрование'),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-              )
-            : _pages.isEmpty
-            ? const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.document_scanner_outlined, size: 72),
-                    SizedBox(height: 16),
-                    Text(
-                      'Все документы в одном месте',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Отсканируйте или добавьте документ',
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      'Обработка выполняется на устройстве',
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              )
-            : GridView.builder(
-                padding: const EdgeInsets.all(12),
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                ),
-                itemCount: _pages.length,
-                itemBuilder: (context, i) => Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: FutureBuilder<Uint8List>(
-                        future: _readPage(_pages[i]),
-                        builder: (context, snapshot) {
-                          if (snapshot.hasError) {
-                            return const Center(
-                              child: Icon(Icons.broken_image_outlined),
-                            );
-                          }
-                          if (!snapshot.hasData) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
-                          }
-                          return Image.memory(
-                            snapshot.data!,
-                            fit: BoxFit.cover,
-                          );
-                        },
-                      ),
-                    ),
-                    Positioned(
-                      left: 6,
-                      top: 6,
-                      child: CircleAvatar(
-                        radius: 14,
-                        child: Text('${i + 1}'),
-                      ),
-                    ),
-                    Positioned(
-                      right: 4,
-                      top: 4,
-                      child: IconButton.filledTonal(
-                        tooltip: 'Удалить страницу',
-                        onPressed: _busy
-                            ? null
-                            : () => _removePage(i),
-                        icon: const Icon(Icons.close, size: 18),
-                      ),
-                    ),
-                    Positioned(
-                      left: 4,
-                      right: 4,
-                      bottom: 4,
-                      child: FilledButton.tonalIcon(
-                        onPressed:
-                            _busy ? null : () => _recognizePage(_pages[i]),
-                        icon: const Icon(Icons.text_snippet_outlined),
-                        label: const Text('Распознать текст'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+                      if (_pages.isEmpty)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 25,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(23),
+                              ),
+                              child: const Column(
+                                children: [
+                                  Icon(
+                                    Icons.note_add_outlined,
+                                    color: Color(0xFF315AA5),
+                                    size: 42,
+                                  ),
+                                  SizedBox(height: 12),
+                                  Text(
+                                    'Пока нет документов',
+                                    style: TextStyle(
+                                      color: Color(0xFF101828),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 19,
+                                    ),
+                                  ),
+                                  SizedBox(height: 7),
+                                  Text(
+                                    'Отсканируйте или добавьте первый документ',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Color(0xFF667085),
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  SizedBox(height: 6),
+                                  Text(
+                                    'Обработка выполняется на устройстве',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Color(0xFF8490A5),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (_pages.isNotEmpty)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Страницы документа',
+                                  style: TextStyle(
+                                    color: Color(0xFF101828),
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: DropdownButtonFormField<String>(
+                                        initialValue: _activeDocumentId,
+                                        isExpanded: true,
+                                        decoration: InputDecoration(
+                                          labelText: 'Документ',
+                                          filled: true,
+                                          fillColor: Colors.white,
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: BorderSide.none,
+                                          ),
+                                        ),
+                                        items: _documentTitles.entries
+                                            .map((entry) => DropdownMenuItem<String>(
+                                                  value: entry.key,
+                                                  child: Text(
+                                                    entry.value,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ))
+                                            .toList(),
+                                        onChanged: (value) {
+                                          setState(() => _activeDocumentId = value);
+                                          _persistDocumentIndex();
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    IconButton.filledTonal(
+                                      tooltip: 'Создать документ',
+                                      onPressed: _busy ? null : _createDocument,
+                                      icon: const Icon(Icons.create_new_folder_outlined),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                TextField(
+                                  controller: _searchController,
+                                  onChanged: (value) => setState(() => _searchQuery = value),
+                                  decoration: InputDecoration(
+                                    hintText: 'Поиск страниц',
+                                    prefixIcon: const Icon(Icons.search),
+                                    suffixIcon: _searchQuery.isEmpty
+                                        ? null
+                                        : IconButton(
+                                            tooltip: 'Очистить поиск',
+                                            onPressed: () {
+                                              _searchController.clear();
+                                              setState(() => _searchQuery = '');
+                                            },
+                                            icon: const Icon(Icons.close),
+                                          ),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(15),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                  ),
+                                ),
+                                if (_visiblePageIndexes.isEmpty)
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 18),
+                                    child: Center(
+                                      child: Text('Ничего не найдено'),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      if (_pages.isNotEmpty && _visiblePageIndexes.isNotEmpty)
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+                          sliver: SliverGrid(
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount:
+                                  MediaQuery.sizeOf(context).width > 650 ? 3 : 2,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                            ),
+                            delegate: SliverChildBuilderDelegate(
+                              (context, i) => Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: FutureBuilder<Uint8List>(
+                                      future: _readPage(_pages[_visiblePageIndexes[i]]),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.hasError) {
+                                          return const ColoredBox(
+                                            color: Colors.white,
+                                            child: Center(
+                                              child: Icon(Icons.broken_image_outlined),
+                                            ),
+                                          );
+                                        }
+                                        if (!snapshot.hasData) {
+                                          return const ColoredBox(
+                                            color: Colors.white,
+                                            child: Center(
+                                              child: CircularProgressIndicator(),
+                                            ),
+                                          );
+                                        }
+                                        return InkWell(
+                                          onTap: () => _showPage(
+                                            _pages[_visiblePageIndexes[i]],
+                                            _visiblePageIndexes[i] + 1,
+                                          ),
+                                          child: Image.memory(
+                                            snapshot.data!,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  Positioned(
+                                    left: 7,
+                                    top: 7,
+                                    child: CircleAvatar(
+                                      radius: 14,
+                                      backgroundColor: Colors.white,
+                                      child: Text(
+                                        '${_visiblePageIndexes[i] + 1}',
+                                        style: const TextStyle(
+                                          color: Color(0xFF1B356B),
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    right: 4,
+                                    top: 4,
+                                    child: IconButton.filledTonal(
+                                      tooltip: 'Удалить страницу',
+                                      onPressed: _busy ? null : () => _removePage(_visiblePageIndexes[i]),
+                                      icon: const Icon(Icons.close, size: 18),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    left: 4,
+                                    right: 4,
+                                    bottom: 4,
+                                    child: FilledButton.tonalIcon(
+                                      onPressed: _busy
+                                          ? null
+                                          : () => _recognizePage(_pages[_visiblePageIndexes[i]]),
+                                      icon: const Icon(
+                                        Icons.text_snippet_outlined,
+                                        size: 18,
+                                      ),
+                                      label: const Text(
+                                        'Распознать текст',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              childCount: _visiblePageIndexes.length,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
         bottomNavigationBar: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF3F5FA),
+              border: Border(
+                top: BorderSide(color: Color(0xFFE2E7F0)),
+              ),
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -503,8 +1050,16 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                         onPressed: _busy || !_vaultReady
                             ? null
                             : () => _addPage(ImageSource.camera),
-                        icon: const Icon(Icons.camera_alt),
+                        icon: const Icon(Icons.camera_alt_outlined),
                         label: const Text('Камера'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
+                          foregroundColor: const Color(0xFF244B91),
+                          side: const BorderSide(color: Color(0xFFC9D5EA)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -513,29 +1068,82 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                         onPressed: _busy || !_vaultReady
                             ? null
                             : () => _addPage(ImageSource.gallery),
-                        icon: const Icon(Icons.photo_library),
+                        icon: const Icon(Icons.photo_library_outlined),
                         label: const Text('Галерея'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
+                          foregroundColor: const Color(0xFF244B91),
+                          side: const BorderSide(color: Color(0xFFC9D5EA)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 9),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed:
-                        _busy || !_vaultReady || _pages.isEmpty ? null : _exportPdf,
-                    icon: const Icon(Icons.picture_as_pdf),
+                    onPressed: _busy || !_vaultReady || _pages.isEmpty
+                        ? null
+                        : _exportPdf,
+                    icon: const Icon(Icons.picture_as_pdf_outlined),
                     label: Text(
                       _busy
                           ? (_busyLabel ?? 'Подождите…')
-                          : 'Экспорт в PDF (${_pages.length})',
+                          : 'Экспорт в PDF',
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF244B91),
+                      minimumSize: const Size.fromHeight(52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
           ),
+        ),
+      );
+
+  static Widget _statTile(String value, String label) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0x2FFFFFFF),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 19,
+                ),
+              ),
+            ),
+            const SizedBox(height: 5),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: Color(0xFFD7E1F5),
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ],
         ),
       );
 }
