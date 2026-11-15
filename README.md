@@ -21,7 +21,7 @@ Privacy-first document scanner prototype for iPhone and Android.
 - Automatic edge detection and perspective correction run on imported still images; live camera edge tracking, manual corner adjustment, and document-wide text search are not implemented yet.
 - App-switcher privacy masking and re-authentication on background/foreground transitions are implemented in Flutter lifecycle handling but still require real-device testing. iOS does not provide a general guarantee against screenshots taken while the app is actively visible.
 - OCR temporarily decrypts a page to an app temporary file; PDF export creates a readable PDF in temporary storage for sharing. These temporary files are not encrypted by the current prototype.
-- This is an early development scaffold, not a production-ready medical-document storage product. Do not store sensitive patient information in this prototype until security review, real-device testing, backup behavior review, and release hardening are complete.
+- This is an early development prototype, not a production-ready secure document vault. Do not store highly sensitive personal or business documents until security review, real-device testing, backup behavior review, and release hardening are complete.
 - No signed release build or physical-device test has been completed yet.
 
 ## Build
