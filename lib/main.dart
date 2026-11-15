@@ -141,22 +141,26 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
   }
 
   Future<void> _cleanupTemporaryFiles() async {
-    final directory = await getTemporaryDirectory();
-    if (!await directory.exists()) return;
-    await for (final entity in directory.list()) {
-      if (entity is File) {
-        final name = entity.uri.pathSegments.isEmpty
-            ? ''
-            : entity.uri.pathSegments.last;
-        if (name.startsWith('ai_scanner_ocr_') ||
-            name.startsWith('AI_Scanner_')) {
-          try {
-            await entity.delete();
-          } on FileSystemException {
-            // A temporary file may already have been removed by the OS.
+    try {
+      final directory = await getTemporaryDirectory();
+      if (!await directory.exists()) return;
+      await for (final entity in directory.list()) {
+        if (entity is File) {
+          final name = entity.uri.pathSegments.isEmpty
+              ? ''
+              : entity.uri.pathSegments.last;
+          if (name.startsWith('ai_scanner_ocr_') ||
+              name.startsWith('AI_Scanner_')) {
+            try {
+              await entity.delete();
+            } on FileSystemException {
+              // A temporary file may already have been removed by the OS.
+            }
           }
         }
       }
+    } on FileSystemException {
+      // Startup cleanup is best-effort and must not block vault access.
     }
   }
 
