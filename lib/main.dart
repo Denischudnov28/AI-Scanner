@@ -551,24 +551,24 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                                     setState(() => _activeDocumentId = entry.key);
                                     Navigator.pop(sheetContext);
                                   },
-                                  trailing: PopupMenuButton<String>(
-                                    tooltip: 'Действия с документом',
-                                    onSelected: (action) async {
-                                      if (action == 'rename') {
-                                        await _renameDocument(entry.key);
-                                      } else if (action == 'delete') {
-                                        await _deleteDocument(entry.key);
-                                      }
-                                      if (mounted) refreshSheet(() {});
-                                    },
-                                    itemBuilder: (_) => const [
-                                      PopupMenuItem(
-                                        value: 'rename',
-                                        child: Text('Переименовать'),
+                                  trailing: Wrap(
+                                    spacing: 0,
+                                    children: [
+                                      IconButton(
+                                        tooltip: 'Переименовать документ',
+                                        icon: const Icon(Icons.edit_outlined),
+                                        onPressed: () async {
+                                          await _renameDocument(entry.key);
+                                          if (mounted) refreshSheet(() {});
+                                        },
                                       ),
-                                      PopupMenuItem(
-                                        value: 'delete',
-                                        child: Text('Удалить документ'),
+                                      IconButton(
+                                        tooltip: 'Удалить документ',
+                                        icon: const Icon(Icons.delete_outline),
+                                        onPressed: () async {
+                                          await _deleteDocument(entry.key);
+                                          if (mounted) refreshSheet(() {});
+                                        },
                                       ),
                                     ],
                                   ),
