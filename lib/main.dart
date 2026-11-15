@@ -243,9 +243,11 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
         '${tempDir.path}/ai_scanner_ocr_${DateTime.now().microsecondsSinceEpoch}.jpg',
       );
       final clearBytes = await _readPage(file);
-      await clearFile.writeAsBytes(clearBytes, flush: true);
       String text;
       try {
+        // Keep the decrypted OCR copy inside the cleanup scope, including
+        // failures while writing the temporary file or starting the OCR engine.
+        await clearFile.writeAsBytes(clearBytes, flush: true);
         if (Platform.isAndroid) {
           text = await const MethodChannel('ai_scanner/russian_ocr')
                   .invokeMethod<String>(
@@ -258,7 +260,11 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
           text = await _ocr.recognizeText(clearFile.path);
         }
       } finally {
-        if (await clearFile.exists()) await clearFile.delete();
+        try {
+          if (await clearFile.exists()) await clearFile.delete();
+        } on FileSystemException {
+          // Best-effort cleanup; stale files are retried on next launch.
+        }
       }
       if (!mounted) return;
       await showDialog<void>(
@@ -337,8 +343,12 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
     } finally {
       final exported = _exportedPdf;
       _exportedPdf = null;
-      if (exported != null && await exported.exists()) {
-        await exported.delete();
+      if (exported != null) {
+        try {
+          if (await exported.exists()) await exported.delete();
+        } on FileSystemException {
+          // Best-effort cleanup; stale exports are retried on next launch.
+        }
       }
       if (mounted) {
         setState(() {
