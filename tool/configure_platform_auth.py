@@ -80,9 +80,9 @@ for settings in (root / "android" / "settings.gradle.kts", root / "android" / "s
             if repo_start >= 0:
                 insert_at = repo_start + len(repo_marker)
                 if settings.name.endswith(".kts"):
-                    repository = '\\n            maven { url = uri("https://jitpack.io") }'
+                    repository = '\n            maven { url = uri("https://jitpack.io") }'
                 else:
-                    repository = "\\n            maven { url 'https://jitpack.io' }"
+                    repository = "\n            maven { url 'https://jitpack.io' }"
                 text = text[:insert_at] + repository + text[insert_at:]
                 settings.write_text(text)
                 jitpack_added = True
@@ -93,11 +93,11 @@ if not jitpack_added:
     if root_gradle.exists():
         text = root_gradle.read_text()
         if "https://jitpack.io" not in text:
-            match = re.search(r"allprojects\\s*\\{\\s*repositories\\s*\\{", text)
+            match = re.search(r"allprojects\s*\\{\s*repositories\s*\\{", text)
             if not match:
                 raise RuntimeError("Could not find allprojects.repositories in android/build.gradle.kts")
             insert_at = match.end()
-            text = text[:insert_at] + '\\n        maven { url = uri("https://jitpack.io") }' + text[insert_at:]
+            text = text[:insert_at] + '\n        maven { url = uri("https://jitpack.io") }' + text[insert_at:]
             root_gradle.write_text(text)
             jitpack_added = True
         else:
