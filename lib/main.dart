@@ -46,7 +46,6 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
   String? _busyLabel;
   bool _reauthenticateOnResume = false;
   bool _appObscured = false;
-  File? _exportedPdf;
 
   @override
   void initState() {
@@ -311,6 +310,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
 
   Future<void> _exportPdf() async {
     if (_pages.isEmpty || _busy) return;
+    File? exported;
     setState(() {
       _busy = true;
       _busyLabel = 'Создание PDF…';
@@ -329,20 +329,19 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
         );
       }
       final dir = await getTemporaryDirectory();
-      final out = File(
+      exported = File(
         '${dir.path}/AI_Scanner_${DateTime.now().millisecondsSinceEpoch}.pdf',
       );
-      await out.writeAsBytes(await doc.save());
-      _exportedPdf = out;
+      await exported.writeAsBytes(await doc.save(), flush: true);
       await Share.shareXFiles(
-        [XFile(out.path)],
+        [XFile(exported.path)],
         text: 'Документ из AI Scanner',
       );
     } catch (e) {
       _message('Не удалось создать PDF: $e');
     } finally {
-      final exported = _exportedPdf;
-      _exportedPdf = null;
+      // Keep the temporary export in scope from creation onward so even a
+      // partially written PDF is cleaned up if writing or sharing fails.
       if (exported != null) {
         try {
           if (await exported.exists()) await exported.delete();
