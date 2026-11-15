@@ -93,7 +93,7 @@ if not jitpack_added:
     if root_gradle.exists():
         text = root_gradle.read_text()
         if "https://jitpack.io" not in text:
-            match = re.search(r"allprojects\s*\\{\s*repositories\s*\\{", text)
+            match = re.search(r"allprojects\s*\{\s*repositories\s*\{", text)
             if not match:
                 raise RuntimeError("Could not find allprojects.repositories in android/build.gradle.kts")
             insert_at = match.end()
