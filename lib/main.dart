@@ -33,7 +33,7 @@ class ScannerHome extends StatefulWidget {
   State<ScannerHome> createState() => _ScannerHomeState();
 }
 
-class _ScannerHomeState extends State<ScannerHome> {
+class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
   final _picker = ImagePicker();
   final _ocr = FlutterNativeOcr();
   final _vault = LocalVault();
@@ -43,11 +43,31 @@ class _ScannerHomeState extends State<ScannerHome> {
   String? _vaultError;
   bool _busy = false;
   String? _busyLabel;
+  bool _reauthenticateOnResume = false;
+  File? _exportedPdf;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeVault();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused && _vaultReady) {
+      _reauthenticateOnResume = true;
+      setState(() => _vaultReady = false);
+    } else if (state == AppLifecycleState.resumed && _reauthenticateOnResume) {
+      _reauthenticateOnResume = false;
+      _unlockVault();
+    }
   }
 
   Future<void> _initializeVault() async {
@@ -204,6 +224,7 @@ class _ScannerHomeState extends State<ScannerHome> {
         '${dir.path}/AI_Scanner_${DateTime.now().millisecondsSinceEpoch}.pdf',
       );
       await out.writeAsBytes(await doc.save());
+      _exportedPdf = out;
       await Share.shareXFiles(
         [XFile(out.path)],
         text: 'Документ из AI Scanner',
@@ -211,6 +232,11 @@ class _ScannerHomeState extends State<ScannerHome> {
     } catch (e) {
       _message('Не удалось создать PDF: $e');
     } finally {
+      final exported = _exportedPdf;
+      _exportedPdf = null;
+      if (exported != null && await exported.exists()) {
+        await exported.delete();
+      }
       if (mounted) {
         setState(() {
           _busy = false;
