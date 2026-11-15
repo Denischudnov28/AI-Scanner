@@ -10,6 +10,16 @@ Future<void> createDocument(WidgetTester tester, String name) async {
   await tester.pump(const Duration(milliseconds: 300));
 }
 
+Future<void> openDocumentActions(WidgetTester tester) async {
+  final menuButton = find.byType(PopupMenuButton<String>).last;
+  await tester.ensureVisible(menuButton);
+  await tester.pump(const Duration(milliseconds: 300));
+  await tester.tap(menuButton);
+  // The document sheet is displayed above an animated home screen; pump the
+  // popup route directly instead of waiting for the whole app to settle.
+  await tester.pump(const Duration(milliseconds: 500));
+}
+
 void main() {
   testWidgets('AI Scanner opens with its app title', (tester) async {
     await tester.pumpWidget(const AiScannerApp());
@@ -48,10 +58,8 @@ void main() {
     await tester.tap(find.byTooltip('Мои документы'));
     await tester.pump(const Duration(milliseconds: 300));
 
-    await tester.ensureVisible(find.byTooltip('Действия с документом'));
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.byTooltip('Действия с документом'));
-    await tester.pump(const Duration(milliseconds: 300));
+    await openDocumentActions(tester);
+    expect(find.text('Переименовать'), findsOneWidget);
     await tester.tap(find.text('Переименовать'));
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -70,10 +78,8 @@ void main() {
     await tester.tap(find.byTooltip('Мои документы'));
     await tester.pump(const Duration(milliseconds: 300));
 
-    await tester.ensureVisible(find.byTooltip('Действия с документом'));
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.byTooltip('Действия с документом'));
-    await tester.pump(const Duration(milliseconds: 300));
+    await openDocumentActions(tester);
+    expect(find.text('Удалить документ'), findsOneWidget);
     await tester.tap(find.text('Удалить документ'));
     await tester.pump(const Duration(milliseconds: 300));
 
