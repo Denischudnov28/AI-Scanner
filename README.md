@@ -10,8 +10,10 @@ Privacy-first document scanner prototype for iPhone and Android.
 - Verify AES-GCM encryption, per-file nonce uniqueness, tamper detection, and malformed-key handling with unit tests.
 - Export pages to a PDF and share it.
 - Run on-device OCR on an individual page and copy the recognized text. iOS uses Apple Vision; Android uses the bundled Russian Tesseract model offline.
-- Encrypt stored page images locally with AES-256-GCM; keep the encryption key in iOS Keychain / Android Keystore via secure storage.
-- Require Face ID / Touch ID or the device passcode before opening the local vault.
+- Encrypt stored page images locally with AES-256-GCM; protect the AES key itself with OS authentication: iOS Keychain access control (`userPresence`, Face ID / Touch ID or device passcode, Secure Enclave-backed protection where available) and Android Keystore biometric storage.
+- Protect the AES key at rest with OS authentication and drop its in-memory Dart reference when the app is backgrounded. iOS Keychain `userPresence` is checked when the key is read. Android `flutter_secure_storage` v10 may cache its authenticated native cipher for the process lifetime, so clearing the Dart reference does not guarantee a fresh Android prompt on every resume. Per-operation Android authentication is deferred until after a v10 migration release, when the project can safely move to v11.2. Dart does not guarantee immediate zeroization of previously allocated memory.
+- Migrate the existing AES key to a new authentication-gated storage entry without changing the key; verify the protected copy before deleting the legacy copy. If authentication or verification fails, keep the legacy key and leave the vault locked.
+- Disable Android app backup so device-bound Keystore material is not restored without its matching key.
 - Hide document previews when the app becomes inactive and require re-authentication after it is backgrounded.
 - Remove stale OCR/PDF temporary files on the next app launch after an interrupted operation.
 
@@ -19,9 +21,9 @@ Privacy-first document scanner prototype for iPhone and Android.
 
 - Russian OCR on Android is implemented with Tesseract4Android and the `rus` model bundled into the APK; it runs locally without a network request. iOS uses Apple Vision's on-device text recognition. OCR quality, memory use, and processing speed still need testing on physical devices and varied document photos.
 - Automatic edge detection and perspective correction run on imported still images; live camera edge tracking, manual corner adjustment, and document-wide text search are not implemented yet.
-- App-switcher privacy masking and re-authentication on background/foreground transitions are implemented in Flutter lifecycle handling but still require real-device testing. iOS does not provide a general guarantee against screenshots taken while the app is actively visible.
+- App-switcher privacy masking and Dart-key clearing on background/foreground transitions are implemented in Flutter lifecycle handling but still require real-device testing. Android biometric key protection requires API 28 or newer; Android 11+ supports the configured biometric-or-device-credential policy, while Android 9–10 may require a strong biometric. iOS does not provide a general guarantee against screenshots taken while the app is actively visible.
 - OCR temporarily decrypts a page to an app temporary file; PDF export creates a readable PDF in temporary storage for sharing. These temporary files are not encrypted by the current prototype.
-- This is an early development prototype, not a production-ready secure document vault. Do not store highly sensitive personal or business documents until security review, real-device testing, backup behavior review, and release hardening are complete.
+- The protected-key migration and authentication-gated storage are covered by unit tests, but Face ID / Touch ID / Android Keystore behavior has not yet been exercised on physical devices. This is an early development prototype, not a production-ready secure document vault. Do not store highly sensitive documents until independent security review, real-device testing, backup behavior review, and release hardening are complete.
 - No signed release build or physical-device test has been completed yet.
 
 ## Build

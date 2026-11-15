@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_native_ocr/flutter_native_ocr.dart';
 import 'package:document_scan/document_scan.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:local_auth/local_auth.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
@@ -38,7 +37,6 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
   final _picker = ImagePicker();
   final _ocr = FlutterNativeOcr();
   final _vault = LocalVault();
-  final _auth = LocalAuthentication();
   final List<File> _pages = [];
   bool _vaultReady = false;
   String? _vaultError;
@@ -67,7 +65,11 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
       if (mounted) setState(() => _appObscured = true);
       if (state == AppLifecycleState.paused && _vaultReady) {
         _reauthenticateOnResume = true;
-        setState(() => _vaultReady = false);
+        _vault.lock();
+        setState(() {
+          _vaultReady = false;
+          _pages.clear();
+        });
       }
     } else if (state == AppLifecycleState.resumed) {
       if (_reauthenticateOnResume) {
@@ -82,7 +84,6 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
   Future<void> _initializeVault() async {
     try {
       await _cleanupTemporaryFiles();
-      await _vault.initialize();
       await _unlockVault();
     } catch (_) {
       if (mounted) {
@@ -93,48 +94,37 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
 
   Future<void> _unlockVault() async {
     try {
-      final authenticated = await _auth.authenticate(
-        localizedReason: 'Подтвердите личность для доступа к документам',
-        options: const AuthenticationOptions(
-          biometricOnly: false,
-          stickyAuth: true,
-        ),
-      );
+      // Reading the AES key from secure storage itself invokes Face ID /
+      // Touch ID / device-credential authentication at the OS level.
+      await _vault.initialize();
       if (!mounted) return;
-      if (authenticated) {
-        final appDir = await getApplicationDocumentsDirectory();
-        final folder = Directory('${appDir.path}/scans');
-        final savedPages = folder.existsSync()
-            ? await folder
-                .list()
-                .where((entity) =>
-                    entity is File && entity.path.endsWith('.aiscan'))
-                .cast<File>()
-                .toList()
-            : <File>[];
-        savedPages.sort((a, b) => a.path.compareTo(b.path));
-        if (!mounted) return;
-        setState(() {
-          _vaultReady = true;
-          _appObscured = false;
-          _vaultError = null;
-          _pages
-            ..clear()
-            ..addAll(savedPages);
-        });
-      } else {
-        setState(() {
-          _vaultReady = false;
-          _appObscured = false;
-          _vaultError = 'Доступ не подтверждён.';
-        });
-      }
+      final appDir = await getApplicationDocumentsDirectory();
+      final folder = Directory('${appDir.path}/scans');
+      final savedPages = folder.existsSync()
+          ? await folder
+              .list()
+              .where((entity) =>
+                  entity is File && entity.path.endsWith('.aiscan'))
+              .cast<File>()
+              .toList()
+          : <File>[];
+      savedPages.sort((a, b) => a.path.compareTo(b.path));
+      if (!mounted) return;
+      setState(() {
+        _vaultReady = true;
+        _appObscured = false;
+        _vaultError = null;
+        _pages
+          ..clear()
+          ..addAll(savedPages);
+      });
     } catch (_) {
       if (mounted) {
         setState(() {
           _vaultReady = false;
           _appObscured = false;
-          _vaultError = 'Не удалось выполнить биометрическую проверку. Проверьте настройки Face ID или код-пароль устройства.';
+          _vaultError =
+              'Не удалось разблокировать хранилище. Подтвердите Face ID, биометрию или код устройства и повторите попытку.';
         });
       }
     }
