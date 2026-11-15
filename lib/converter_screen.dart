@@ -64,17 +64,15 @@ class _ConverterScreenState extends State<ConverterScreen> {
     final selection = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['jpg', 'jpeg', 'png'],
-      allowMultiple: true,
-      withData: true,
     );
-    if (selection == null || selection.files.isEmpty) return;
+    if (selection.isEmpty) return;
 
     await _run(() async {
       final document = pw.Document();
       var pageCount = 0;
-      for (final selectedFile in selection.files) {
-        final bytes = selectedFile.bytes;
-        if (bytes == null || bytes.isEmpty) {
+      for (final selectedFile in selection) {
+        final bytes = await selectedFile.readAsBytes();
+        if (bytes.isEmpty) {
           throw Exception('Не удалось прочитать файл ${selectedFile.name}.');
         }
         final image = pw.MemoryImage(bytes);
