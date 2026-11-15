@@ -65,20 +65,20 @@ for activity in (root / "android" / "app" / "src" / "main").rglob("MainActivity.
     activity.write_text(text)
 
 # Android Russian OCR: use Tesseract4Android locally, without a network service.
-settings = root / "android" / "settings.gradle.kts"
-if settings.exists():
-    text = settings.read_text()
-    marker = "dependencyResolutionManagement {"
-    if marker in text and "https://jitpack.io" not in text:
-        start = text.index(marker)
-        repo_start = text.index("repositories {", start)
-        insert_at = repo_start + len("repositories {")
-        text = (
-            text[:insert_at]
-            + '\n        maven { url = uri("https://jitpack.io") }'
-            + text[insert_at:]
-        )
-        settings.write_text(text)
+for settings in (root / "android" / "settings.gradle.kts", root / "android" / "settings.gradle"):
+    if settings.exists():
+        text = settings.read_text()
+        marker = "dependencyResolutionManagement {"
+        if marker in text and "https://jitpack.io" not in text:
+            start = text.index(marker)
+            repo_start = text.index("repositories {", start)
+            insert_at = repo_start + len("repositories {")
+            if settings.name.endswith(".kts"):
+                repository = '\n        maven { url = uri("https://jitpack.io") }'
+            else:
+                repository = "\n        maven { url 'https://jitpack.io' }"
+            text = text[:insert_at] + repository + text[insert_at:]
+            settings.write_text(text)
 
 app_gradle = root / "android" / "app" / "build.gradle.kts"
 if app_gradle.exists():
@@ -86,7 +86,7 @@ if app_gradle.exists():
     if "tesseract4android:tesseract4android" not in text:
         text += (
             '\n\ndependencies {\n'
-            '    implementation("cz.adaptech.tesseract4android:tesseract4android:4.9.0")\n'
+            '    implementation("com.github.adaptech-cz.Tesseract4Android:tesseract4android:4.9.0")\n'
             '}\n'
         )
         app_gradle.write_text(text)
