@@ -103,7 +103,7 @@ if not jitpack_added:
         else:
             jitpack_added = True
 
-if not jitpack_added:
+if not jitpack_added and any((root / "android" / name).exists() for name in ("settings.gradle.kts", "settings.gradle")):
     raise RuntimeError("Could not configure JitPack in generated Android Gradle files")
 
 app_gradle = root / "android" / "app" / "build.gradle.kts"
