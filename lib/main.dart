@@ -91,10 +91,32 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
         ),
       );
       if (!mounted) return;
-      setState(() {
-        _vaultReady = authenticated;
-        _vaultError = authenticated ? null : 'Доступ не подтверждён.';
-      });
+      if (authenticated) {
+        final appDir = await getApplicationDocumentsDirectory();
+        final folder = Directory('${appDir.path}/scans');
+        final savedPages = folder.existsSync()
+            ? await folder
+                .list()
+                .where((entity) =>
+                    entity is File && entity.path.endsWith('.aiscan'))
+                .cast<File>()
+                .toList()
+            : <File>[];
+        savedPages.sort((a, b) => a.path.compareTo(b.path));
+        if (!mounted) return;
+        setState(() {
+          _vaultReady = true;
+          _vaultError = null;
+          _pages
+            ..clear()
+            ..addAll(savedPages);
+        });
+      } else {
+        setState(() {
+          _vaultReady = false;
+          _vaultError = 'Доступ не подтверждён.';
+        });
+      }
     } catch (_) {
       if (mounted) {
         setState(() {
