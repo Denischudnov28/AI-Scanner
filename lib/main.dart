@@ -401,10 +401,25 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.document_scanner_outlined, size: 72),
-                    SizedBox(height: 12),
-                    Text('Отсканируйте или добавьте документ'),
+                    SizedBox(height: 16),
+                    Text(
+                      'Все документы в одном месте',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Отсканируйте или добавьте документ',
+                      textAlign: TextAlign.center,
+                    ),
                     SizedBox(height: 6),
-                    Text('Обработка выполняется на устройстве'),
+                    Text(
+                      'Обработка выполняется на устройстве',
+                      textAlign: TextAlign.center,
+                    ),
                   ],
                 ),
               )
