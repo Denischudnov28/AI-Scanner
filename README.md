@@ -27,12 +27,14 @@ Privacy-first document scanner prototype for iPhone and Android.
 
 ## Build
 
-Install Flutter, then run:
+Install Flutter, generate the native platform projects, then run:
 
 ```sh
+flutter create --platforms=android,ios --project-name ai_scanner .
+python3 tool/configure_platform_auth.py
 flutter pub get
 flutter analyze
 flutter run
 ```
 
-iOS builds require macOS and Xcode. The OCR plugin supports iOS 13+ and Android; Android build settings may need compileSdk 35 and Java 11 or newer.
+The CI pipeline generates platform projects and verifies Android and iOS simulator builds. iOS builds require macOS and Xcode. Installing on a physical iPhone requires an Apple Developer signing certificate and a matching provisioning profile; the current simulator artifact is not installable on a physical iPhone.
