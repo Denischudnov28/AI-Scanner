@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Future<void> pumpApp(WidgetTester tester) async {
-  tester.view.physicalSize = const Size(800, 1200);
+  tester.view.physicalSize = const Size(800, 2000);
   tester.view.devicePixelRatio = 1;
   await tester.pumpWidget(const AiScannerApp());
 }
