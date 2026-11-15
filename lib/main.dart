@@ -44,6 +44,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
   bool _busy = false;
   String? _busyLabel;
   bool _reauthenticateOnResume = false;
+  bool _appObscured = false;
   File? _exportedPdf;
 
   @override
@@ -61,17 +62,26 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused && _vaultReady) {
-      _reauthenticateOnResume = true;
-      setState(() => _vaultReady = false);
-    } else if (state == AppLifecycleState.resumed && _reauthenticateOnResume) {
-      _reauthenticateOnResume = false;
-      _unlockVault();
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      if (mounted) setState(() => _appObscured = true);
+      if (state == AppLifecycleState.paused && _vaultReady) {
+        _reauthenticateOnResume = true;
+        setState(() => _vaultReady = false);
+      }
+    } else if (state == AppLifecycleState.resumed) {
+      if (_reauthenticateOnResume) {
+        _reauthenticateOnResume = false;
+        _unlockVault();
+      } else if (mounted) {
+        setState(() => _appObscured = false);
+      }
     }
   }
 
   Future<void> _initializeVault() async {
     try {
+      await _cleanupTemporaryFiles();
       await _vault.initialize();
       await _unlockVault();
     } catch (_) {
@@ -106,6 +116,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
         if (!mounted) return;
         setState(() {
           _vaultReady = true;
+          _appObscured = false;
           _vaultError = null;
           _pages
             ..clear()
@@ -114,6 +125,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
       } else {
         setState(() {
           _vaultReady = false;
+          _appObscured = false;
           _vaultError = 'Доступ не подтверждён.';
         });
       }
@@ -121,8 +133,29 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
       if (mounted) {
         setState(() {
           _vaultReady = false;
+          _appObscured = false;
           _vaultError = 'Не удалось выполнить биометрическую проверку. Проверьте настройки Face ID или код-пароль устройства.';
         });
+      }
+    }
+  }
+
+  Future<void> _cleanupTemporaryFiles() async {
+    final directory = await getTemporaryDirectory();
+    if (!await directory.exists()) return;
+    await for (final entity in directory.list()) {
+      if (entity is File) {
+        final name = entity.uri.pathSegments.isEmpty
+            ? ''
+            : entity.uri.pathSegments.last;
+        if (name.startsWith('ai_scanner_ocr_') ||
+            name.startsWith('AI_Scanner_')) {
+          try {
+            await entity.delete();
+          } on FileSystemException {
+            // A temporary file may already have been removed by the OS.
+          }
+        }
       }
     }
   }
@@ -282,7 +315,14 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
           title: const Text('AI Scanner'),
           centerTitle: true,
         ),
-        body: !_vaultReady
+        body: _appObscured
+            ? const ColoredBox(
+                color: Color(0xFF101828),
+                child: Center(
+                  child: Icon(Icons.lock_outline, color: Colors.white, size: 56),
+                ),
+              )
+            : !_vaultReady
             ? Center(
                 child: _vaultError == null
                     ? const CircularProgressIndicator()
