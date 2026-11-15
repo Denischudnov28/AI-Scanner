@@ -72,7 +72,7 @@ void main() {
 
     // Reopen the library to verify the persisted title rather than the
     // bottom sheet's previously built list snapshot.
-    await tester.pageBack();
+    tester.state<NavigatorState>(find.byType(Navigator).first).pop();
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byTooltip('Мои документы'));
     await tester.pump();
