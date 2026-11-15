@@ -165,20 +165,33 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
   }
 
   Future<void> _addPage(ImageSource source) async {
+    XFile? pickedImage;
     try {
-      final image = await _picker.pickImage(source: source, imageQuality: 92);
-      if (image == null || !mounted) return;
+      pickedImage = await _picker.pickImage(source: source, imageQuality: 92);
+      if (pickedImage == null || !mounted) return;
+      final clearBytes = await File(pickedImage.path).readAsBytes();
+      final encryptedBytes = await _vault.encrypt(clearBytes);
       final dir = await getApplicationDocumentsDirectory();
       final folder = Directory('${dir.path}/scans');
       await folder.create(recursive: true);
       final target = File(
         '${folder.path}/page_${DateTime.now().microsecondsSinceEpoch}.aiscan',
       );
-      final clearBytes = await File(image.path).readAsBytes();
-      await target.writeAsBytes(await _vault.encrypt(clearBytes), flush: true);
+      await target.writeAsBytes(encryptedBytes, flush: true);
       if (mounted) setState(() => _pages.add(target));
     } catch (e) {
       _message('Не удалось добавить страницу: $e');
+    } finally {
+      // image_picker creates a temporary plaintext copy. Remove it as soon as
+      // the encrypted vault copy has been written (or the import has failed).
+      if (pickedImage != null) {
+        try {
+          final temporaryImage = File(pickedImage.path);
+          if (await temporaryImage.exists()) await temporaryImage.delete();
+        } on FileSystemException {
+          // The OS may already have cleaned the picker cache.
+        }
+      }
     }
   }
 
