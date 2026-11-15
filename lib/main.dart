@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_ocr/flutter_native_ocr.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
@@ -37,6 +38,7 @@ class _ScannerHomeState extends State<ScannerHome> {
   final _picker = ImagePicker();
   final _ocr = FlutterNativeOcr();
   final _vault = LocalVault();
+  final _auth = LocalAuthentication();
   final List<File> _pages = [];
   bool _vaultReady = false;
   String? _vaultError;
@@ -52,9 +54,35 @@ class _ScannerHomeState extends State<ScannerHome> {
   Future<void> _initializeVault() async {
     try {
       await _vault.initialize();
-      if (mounted) setState(() => _vaultReady = true);
-    } catch (e) {
-      if (mounted) setState(() => _vaultError = e.toString());
+      await _unlockVault();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _vaultError = 'Не удалось открыть защищённое хранилище.');
+      }
+    }
+  }
+
+  Future<void> _unlockVault() async {
+    try {
+      final authenticated = await _auth.authenticate(
+        localizedReason: 'Подтвердите личность для доступа к документам',
+        options: const AuthenticationOptions(
+          biometricOnly: false,
+          stickyAuth: true,
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _vaultReady = authenticated;
+        _vaultError = authenticated ? null : 'Доступ не подтверждён.';
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _vaultReady = false;
+          _vaultError = 'Не удалось выполнить биометрическую проверку. Проверьте настройки Face ID или код-пароль устройства.';
+        });
+      }
     }
   }
 
@@ -213,9 +241,20 @@ class _ScannerHomeState extends State<ScannerHome> {
                     ? const CircularProgressIndicator()
                     : Padding(
                         padding: const EdgeInsets.all(24),
-                        child: Text(
-                          'Не удалось открыть защищённое хранилище. Перезапустите приложение.\\n$_vaultError',
-                          textAlign: TextAlign.center,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _vaultError ?? 'Защищённое хранилище заблокировано.',
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            FilledButton.icon(
+                              onPressed: _unlockVault,
+                              icon: const Icon(Icons.lock_open),
+                              label: const Text('Повторить разблокировку'),
+                            ),
+                          ],
                         ),
                       ),
               )
