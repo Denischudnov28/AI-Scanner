@@ -5,7 +5,7 @@ Privacy-first document scanner prototype for iPhone and Android.
 ## Implemented in the current prototype
 
 - Import document pages from the camera or photo library.
-- Organize multiple pages in one document and remove unwanted pages (also deletes the encrypted page file).
+- Organize multiple pages into named documents, move pages between documents without re-encrypting their image data, and remove unwanted pages (also deletes the encrypted page file).
 - Save encrypted pages through an atomic staging-file rename; interrupted writes are ignored and cleaned up on the next unlock.
 - Detect document edges and correct perspective locally during photo import; if detection fails, preserve the original image.
 - Verify AES-GCM encryption, per-file nonce uniqueness, tamper detection, and malformed-key handling with unit tests.
