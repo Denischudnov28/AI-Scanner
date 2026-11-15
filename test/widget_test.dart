@@ -35,8 +35,9 @@ void main() {
     await createDocument(tester, 'Договор аренды');
 
     await tester.tap(find.byTooltip('Мои документы'));
-    // Allow the modal sheet's entrance transition to finish before interacting.
-    await tester.pump(const Duration(milliseconds: 700));
+    // Start the route transition, then advance time until the sheet is fully visible.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
     expect(find.text('Мои документы'), findsOneWidget);
     expect(find.text('Договор аренды'), findsOneWidget);
     expect(find.text('0 страниц'), findsOneWidget);
@@ -53,8 +54,9 @@ void main() {
     await pumpApp(tester);
     await createDocument(tester, 'Старое название');
     await tester.tap(find.byTooltip('Мои документы'));
-    // Allow the modal sheet's entrance transition to finish before interacting.
-    await tester.pump(const Duration(milliseconds: 700));
+    // Start the route transition, then advance time until the sheet is fully visible.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
 
     final renameButton = find.byWidgetPredicate(
       (widget) => widget is IconButton && widget.tooltip == 'Переименовать документ',
@@ -77,8 +79,9 @@ void main() {
     await pumpApp(tester);
     await createDocument(tester, 'Документ для удаления');
     await tester.tap(find.byTooltip('Мои документы'));
-    // Allow the modal sheet's entrance transition to finish before interacting.
-    await tester.pump(const Duration(milliseconds: 700));
+    // Start the route transition, then advance time until the sheet is fully visible.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
 
     final deleteButton = find.byWidgetPredicate(
       (widget) => widget is IconButton && widget.tooltip == 'Удалить документ',
