@@ -104,7 +104,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     // Reopen the library so the assertion observes the updated document index.
-    await tester.pageBack();
+    tester.state<NavigatorState>(find.byType(Navigator).first).pop();
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byTooltip('Мои документы'));
     await tester.pump();
