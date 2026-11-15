@@ -64,4 +64,99 @@ for activity in (root / "android" / "app" / "src" / "main").rglob("MainActivity.
     text = text.replace("extends FlutterActivity", "extends FlutterFragmentActivity")
     activity.write_text(text)
 
-print("Native Face ID / biometric settings configured.")
+# Android Russian OCR: use Tesseract4Android locally, without a network service.
+settings = root / "android" / "settings.gradle.kts"
+if settings.exists():
+    text = settings.read_text()
+    marker = "dependencyResolutionManagement {"
+    if marker in text and "https://jitpack.io" not in text:
+        text = text.replace(
+            "repositories {",
+            'repositories {\n        maven { url = uri("https://jitpack.io") }',
+            1,
+        )
+        settings.write_text(text)
+
+app_gradle = root / "android" / "app" / "build.gradle.kts"
+if app_gradle.exists():
+    text = app_gradle.read_text()
+    if "tesseract4android:tesseract4android" not in text:
+        text += (
+            '\n\ndependencies {\n'
+            '    implementation("cz.adaptech.tesseract4android:tesseract4android:4.9.0")\n'
+            '}\n'
+        )
+        app_gradle.write_text(text)
+
+for activity in (root / "android" / "app" / "src" / "main").rglob("MainActivity.kt"):
+    package_match = re.search(r"^package\s+[\w.]+", activity.read_text(), re.MULTILINE)
+    package_line = package_match.group(0) if package_match else "package com.example.ai_scanner"
+    activity.write_text(
+        package_line
+        + '''
+
+import android.graphics.BitmapFactory
+import android.os.Handler
+import android.os.Looper
+import com.googlecode.tesseract.android.TessBaseAPI
+import io.flutter.embedding.android.FlutterFragmentActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
+import java.io.File
+
+class MainActivity : FlutterFragmentActivity() {
+    private val channelName = "ai_scanner/russian_ocr"
+
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
+            .setMethodCallHandler { call, result ->
+                if (call.method != "recognizeRussian") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                val imagePath = call.argument<String>("imagePath")
+                if (imagePath.isNullOrBlank()) {
+                    result.error("BAD_ARGUMENT", "Image path is missing", null)
+                    return@setMethodCallHandler
+                }
+                Thread {
+                    var api: TessBaseAPI? = null
+                    try {
+                        val root = File(filesDir, "ai_scanner_tesseract")
+                        val data = File(root, "tessdata")
+                        if (!data.exists()) data.mkdirs()
+                        val model = File(data, "rus.traineddata")
+                        if (!model.exists()) {
+                            assets.open("tessdata/rus.traineddata").use { input ->
+                                model.outputStream().use { output -> input.copyTo(output) }
+                            }
+                        }
+                        api = TessBaseAPI()
+                        if (!api.init(root.absolutePath, "rus")) {
+                            throw IllegalStateException("Не удалось загрузить русскую OCR-модель")
+                        }
+                        val bitmap = BitmapFactory.decodeFile(imagePath)
+                            ?: throw IllegalArgumentException("Не удалось открыть изображение")
+                        try {
+                            api.setImage(bitmap)
+                            val recognized = api.utF8Text ?: ""
+                            Handler(Looper.getMainLooper()).post { result.success(recognized) }
+                        } finally {
+                            bitmap.recycle()
+                        }
+                    } catch (error: Exception) {
+                        Handler(Looper.getMainLooper()).post {
+                            result.error("OCR_FAILED", error.message, null)
+                        }
+                    } finally {
+                        api?.recycle()
+                    }
+                }.start()
+            }
+    }
+}
+'''
+    )
+
+print("Native Face ID / biometric settings and offline Russian Android OCR configured.")
