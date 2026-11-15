@@ -166,7 +166,12 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
   }
 
   Future<void> _addPage(ImageSource source) async {
+    if (_busy || !_vaultReady) return;
     XFile? pickedImage;
+    setState(() {
+      _busy = true;
+      _busyLabel = 'Добавление страницы…';
+    });
     try {
       pickedImage = await _picker.pickImage(source: source, imageQuality: 92);
       if (pickedImage == null || !mounted) return;
@@ -205,6 +210,12 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
         } on FileSystemException {
           // The OS may already have cleaned the picker cache.
         }
+      }
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _busyLabel = null;
+        });
       }
     }
   }
