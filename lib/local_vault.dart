@@ -48,18 +48,11 @@ class LocalVault {
     }
 
     final legacy = await _keyStore.readLegacy(_legacyKeyName);
-    final bytes = legacy == null
-        ? _newKey()
-        : _decodeKey(legacy);
+    final bytes = legacy == null ? _newKey() : _decodeKey(legacy);
 
-    await _keyStore.writeProtected(
-      _protectedKeyName,
-      base64Encode(bytes),
-    );
+    await _keyStore.writeProtected(_protectedKeyName, base64Encode(bytes));
 
-    // This read is intentional: it proves the new item can actually be
-    // retrieved through the OS authentication gate before the old key is
-    // removed or the in-memory vault is unlocked.
+    // Verify that the protected entry can be read before deleting the old key.
     final verified = await _keyStore.readProtected(_protectedKeyName);
     if (verified == null) {
       throw StateError('Защищённый ключ не удалось проверить');
@@ -73,7 +66,8 @@ class LocalVault {
     _key = SecretKey(verifiedBytes);
   }
 
-  /// Drops the data-encryption key from the Dart object when the app is locked.
+  /// Drops the data-encryption key reference when the app is locked.
+  /// Dart does not guarantee zeroization of previously allocated memory.
   void lock() {
     _key = null;
   }
@@ -148,9 +142,9 @@ class _PlatformVaultKeyStore implements VaultKeyStore {
             accessibility: KeychainAccessibility.first_unlock_this_device,
           ),
           aOptions: AndroidOptions(
-            // Preserve the v9 EncryptedSharedPreferences migration path.
+            // v11 reads the v10 cipher format; v10 migration must have run
+            // before this upgrade. Keep errors fatal to avoid silent key loss.
             resetOnError: false,
-            encryptedSharedPreferences: true,
             migrateOnAlgorithmChange: true,
             migrateWithBackup: true,
           ),
@@ -164,6 +158,7 @@ class _PlatformVaultKeyStore implements VaultKeyStore {
           aOptions: AndroidOptions.biometric(
             resetOnError: false,
             enforceBiometrics: true,
+            requireBiometricsPerOperation: true,
             biometricType: AndroidBiometricType.biometricOrDeviceCredential,
             migrateOnAlgorithmChange: true,
             migrateWithBackup: true,
