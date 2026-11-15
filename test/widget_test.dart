@@ -10,14 +10,6 @@ Future<void> createDocument(WidgetTester tester, String name) async {
   await tester.pump(const Duration(milliseconds: 300));
 }
 
-Future<void> openDocumentActions(WidgetTester tester) async {
-  final actionsButton = find.byTooltip('Действия с документом');
-  await tester.ensureVisible(actionsButton);
-  await tester.pump(const Duration(milliseconds: 300));
-  await tester.tap(actionsButton);
-  await tester.pump(const Duration(milliseconds: 300));
-}
-
 void main() {
   testWidgets('AI Scanner opens with its app title', (tester) async {
     await tester.pumpWidget(const AiScannerApp());
@@ -56,9 +48,9 @@ void main() {
     await tester.tap(find.byTooltip('Мои документы'));
     await tester.pump(const Duration(milliseconds: 300));
 
-    await openDocumentActions(tester);
-    expect(find.text('Переименовать'), findsOneWidget);
-    await tester.tap(find.text('Переименовать'));
+    final renameButton = find.byTooltip('Переименовать документ');
+    await tester.ensureVisible(renameButton);
+    await tester.tap(renameButton);
     await tester.pump(const Duration(milliseconds: 300));
 
     await tester.enterText(find.byType(TextField).last, 'Новое название');
@@ -76,9 +68,9 @@ void main() {
     await tester.tap(find.byTooltip('Мои документы'));
     await tester.pump(const Duration(milliseconds: 300));
 
-    await openDocumentActions(tester);
-    expect(find.text('Удалить документ'), findsOneWidget);
-    await tester.tap(find.text('Удалить документ'));
+    final deleteButton = find.byTooltip('Удалить документ');
+    await tester.ensureVisible(deleteButton);
+    await tester.tap(deleteButton);
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Удалить документ?'), findsOneWidget);
