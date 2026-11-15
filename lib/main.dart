@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -42,10 +43,21 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
   final List<File> _pages = [];
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  final Map<String, String> _pageDocumentIds = {};
+  final Map<String, String> _documentTitles = {};
+  String? _activeDocumentId;
+
   List<int> get _visiblePageIndexes => List<int>.generate(_pages.length, (i) => i)
-      .where((i) => 'страница ${i + 1} ${_pages[i].uri.pathSegments.last}'
-          .toLowerCase()
-          .contains(_searchQuery.trim().toLowerCase()))
+      .where((i) {
+        final fileName = _pages[i].uri.pathSegments.last;
+        final documentId = _pageDocumentIds[fileName];
+        final belongsToSelectedDocument = _activeDocumentId == null ||
+            documentId == _activeDocumentId;
+        final matchesSearch = 'страница ${i + 1} $fileName'
+            .toLowerCase()
+            .contains(_searchQuery.trim().toLowerCase());
+        return belongsToSelectedDocument && matchesSearch;
+      })
       .toList();
   bool _vaultReady = false;
   String? _vaultError;
@@ -114,6 +126,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
       // crash; only fully renamed .aiscan files are visible to the app.
       await _fileStore.cleanupPendingFiles(folder);
       final savedPages = await _fileStore.listPages(folder);
+      await _restoreDocumentIndex(folder, savedPages);
       if (!mounted) return;
       setState(() {
         _vaultReady = true;
@@ -133,6 +146,115 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
         });
       }
     }
+  }
+
+  Future<void> _restoreDocumentIndex(
+    Directory folder,
+    List<File> savedPages,
+  ) async {
+    final indexFile = File('${folder.path}/documents_index.json');
+    if (await indexFile.exists()) {
+      try {
+        final decoded = jsonDecode(await indexFile.readAsString()) as Map<String, dynamic>;
+        final titles = decoded['titles'] as Map<String, dynamic>? ?? {};
+        final assignments = decoded['pages'] as Map<String, dynamic>? ?? {};
+        _documentTitles
+          ..clear()
+          ..addAll(titles.map((key, value) => MapEntry(key, value.toString())));
+        _pageDocumentIds
+          ..clear()
+          ..addAll(assignments.map((key, value) => MapEntry(key, value.toString())));
+      } catch (_) {
+        _documentTitles.clear();
+        _pageDocumentIds.clear();
+      }
+    }
+    if (savedPages.isNotEmpty && _documentTitles.isEmpty) {
+      _documentTitles['legacy'] = 'Мои документы';
+    }
+    for (final page in savedPages) {
+      final name = page.uri.pathSegments.last;
+      if (!_pageDocumentIds.containsKey(name) ||
+          !_documentTitles.containsKey(_pageDocumentIds[name])) {
+        const fallbackId = 'legacy';
+        _documentTitles.putIfAbsent(fallbackId, () => 'Мои документы');
+        _pageDocumentIds[name] = fallbackId;
+      }
+    }
+    _activeDocumentId ??= _documentTitles.isEmpty ? null : _documentTitles.keys.first;
+    await _persistDocumentIndex(folder);
+  }
+
+  Future<void> _persistDocumentIndex([Directory? targetFolder]) async {
+    final folder = targetFolder ??
+        Directory('${(await getApplicationDocumentsDirectory()).path}/scans');
+    await folder.create(recursive: true);
+    final indexFile = File('${folder.path}/documents_index.json');
+    final pendingFile = File('${folder.path}/documents_index.pending');
+    final payload = jsonEncode({
+      'version': 1,
+      'titles': _documentTitles,
+      'pages': _pageDocumentIds,
+    });
+    await pendingFile.writeAsString(payload, flush: true);
+    await pendingFile.rename(indexFile.path);
+  }
+
+  Future<void> _createDocument() async {
+    final controller = TextEditingController();
+    final title = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Новый документ'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          maxLength: 60,
+          decoration: const InputDecoration(
+            labelText: 'Название документа',
+            hintText: 'Например, Договор аренды',
+          ),
+          onSubmitted: (value) => Navigator.pop(dialogContext, value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('Создать'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (title == null || title.trim().isEmpty || !mounted) return;
+    final id = DateTime.now().microsecondsSinceEpoch.toString();
+    setState(() {
+      _documentTitles[id] = title.trim();
+      _activeDocumentId = id;
+      _searchQuery = '';
+      _searchController.clear();
+    });
+    try {
+      await _persistDocumentIndex();
+    } catch (e) {
+      _message('Не удалось сохранить название документа: $e');
+    }
+  }
+
+  Future<String> _ensureActiveDocument() async {
+    if (_activeDocumentId != null &&
+        _documentTitles.containsKey(_activeDocumentId)) {
+      return _activeDocumentId!;
+    }
+    final id = DateTime.now().microsecondsSinceEpoch.toString();
+    _documentTitles[id] = 'Документ ${_documentTitles.length + 1}';
+    _activeDocumentId = id;
+    await _persistDocumentIndex();
+    return id;
   }
 
   Future<void> _cleanupTemporaryFiles() async {
@@ -195,6 +317,9 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
         folder,
         encryptedBytes,
       );
+      final documentId = await _ensureActiveDocument();
+      _pageDocumentIds[target.uri.pathSegments.last] = documentId;
+      await _persistDocumentIndex(folder);
       if (mounted) setState(() => _pages.add(target));
     } catch (e) {
       _message('Не удалось добавить страницу: $e');
@@ -223,6 +348,8 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
     final file = _pages[index];
     try {
       if (await file.exists()) await file.delete();
+      _pageDocumentIds.remove(file.uri.pathSegments.last);
+      await _persistDocumentIndex();
       if (mounted) setState(() => _pages.removeAt(index));
     } catch (e) {
       _message('Не удалось удалить файл страницы: $e');
@@ -412,7 +539,11 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
   }
 
   Future<void> _exportPdf() async {
-    if (_pages.isEmpty || _busy) return;
+    final exportPages = _activeDocumentId == null
+        ? _pages
+        : _pages.where((file) =>
+            _pageDocumentIds[file.uri.pathSegments.last] == _activeDocumentId).toList();
+    if (exportPages.isEmpty || _busy) return;
     File? exported;
     setState(() {
       _busy = true;
@@ -420,7 +551,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
     });
     try {
       final doc = pw.Document();
-      for (final file in _pages) {
+      for (final file in exportPages) {
         final bytes = await _readPage(file);
         final image = pw.MemoryImage(bytes);
         doc.addPage(
@@ -439,7 +570,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(exported.path)],
-          text: 'Документ из AI Scanner',
+          text: 'Документ «${_documentTitles[_activeDocumentId] ?? 'AI Scanner'}»',
         ),
       );
     } catch (e) {
@@ -714,12 +845,51 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'Мои страницы',
+                                  'Страницы документа',
                                   style: TextStyle(
                                     color: Color(0xFF101828),
                                     fontSize: 20,
                                     fontWeight: FontWeight.w700,
                                   ),
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: DropdownButtonFormField<String>(
+                                        value: _activeDocumentId,
+                                        isExpanded: true,
+                                        decoration: InputDecoration(
+                                          labelText: 'Документ',
+                                          filled: true,
+                                          fillColor: Colors.white,
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: BorderSide.none,
+                                          ),
+                                        ),
+                                        items: _documentTitles.entries
+                                            .map((entry) => DropdownMenuItem<String>(
+                                                  value: entry.key,
+                                                  child: Text(
+                                                    entry.value,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ))
+                                            .toList(),
+                                        onChanged: (value) {
+                                          setState(() => _activeDocumentId = value);
+                                          _persistDocumentIndex();
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    IconButton.filledTonal(
+                                      tooltip: 'Создать документ',
+                                      onPressed: _busy ? null : _createDocument,
+                                      icon: const Icon(Icons.create_new_folder_outlined),
+                                    ),
+                                  ],
                                 ),
                                 const SizedBox(height: 10),
                                 TextField(
