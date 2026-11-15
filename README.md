@@ -10,6 +10,7 @@ Privacy-first document scanner prototype for iPhone and Android.
 - Detect document edges and correct perspective locally during photo import; if detection fails, preserve the original image.
 - Verify AES-GCM encryption, per-file nonce uniqueness, tamper detection, and malformed-key handling with unit tests.
 - Export pages to a PDF and share it.
+- Convert selected JPG/PNG images into a multi-page PDF locally, and render PDF pages into JPG images on-device for sharing or saving.
 - Run on-device OCR on an individual page and copy the recognized text. iOS uses Apple Vision; Android uses the bundled Russian Tesseract model offline.
 - Encrypt stored page images locally with AES-256-GCM; protect the AES key itself with OS authentication: iOS Keychain access control (`userPresence`, Face ID / Touch ID or device passcode, Secure Enclave-backed protection where available) and Android Keystore biometric storage.
 - Protect the AES key at rest with OS authentication and drop its in-memory Dart reference when the app is backgrounded. iOS Keychain `userPresence` is checked when the key is read. Android uses `flutter_secure_storage` v11.2 with `requireBiometricsPerOperation: true`, requesting authentication for each protected-storage operation. Dart does not guarantee immediate zeroization of previously allocated memory.
@@ -17,6 +18,12 @@ Privacy-first document scanner prototype for iPhone and Android.
 - Disable Android app backup so device-bound Keystore material is not restored without its matching key.
 - Hide document previews when the app becomes inactive and require re-authentication after it is backgrounded.
 - Remove stale OCR/PDF temporary files on the next app launch after an interrupted operation.
+
+## Converter scope and limitations
+
+- The first converter version supports JPG/PNG to PDF and PDF to JPG on iOS and Android. Output is passed to the native share sheet, where it can be saved to Files or shared.
+- PDF-to-image conversion rasterizes each page; selectable text and vector content are not preserved in JPG output. PDF input is limited to 100 pages per operation to control memory use.
+- DOCX-to-PDF, PDF merging/splitting, and PNG export from PDF are not included in this first version.
 
 ## Important limitations
 
