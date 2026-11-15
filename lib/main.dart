@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_ocr/flutter_native_ocr.dart';
@@ -6,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
+import 'local_vault.dart';
 
 void main() => runApp(const AiScannerApp());
 
@@ -34,9 +36,31 @@ class ScannerHome extends StatefulWidget {
 class _ScannerHomeState extends State<ScannerHome> {
   final _picker = ImagePicker();
   final _ocr = FlutterNativeOcr();
+  final _vault = LocalVault();
   final List<File> _pages = [];
+  bool _vaultReady = false;
+  String? _vaultError;
   bool _busy = false;
   String? _busyLabel;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeVault();
+  }
+
+  Future<void> _initializeVault() async {
+    try {
+      await _vault.initialize();
+      if (mounted) setState(() => _vaultReady = true);
+    } catch (e) {
+      if (mounted) setState(() => _vaultError = e.toString());
+    }
+  }
+
+  Future<Uint8List> _readPage(File file) async {
+    return _vault.decrypt(await file.readAsBytes());
+  }
 
   Future<void> _addPage(ImageSource source) async {
     try {
@@ -46,9 +70,10 @@ class _ScannerHomeState extends State<ScannerHome> {
       final folder = Directory('${dir.path}/scans');
       await folder.create(recursive: true);
       final target = File(
-        '${folder.path}/page_${DateTime.now().microsecondsSinceEpoch}.jpg',
+        '${folder.path}/page_${DateTime.now().microsecondsSinceEpoch}.aiscan',
       );
-      await File(image.path).copy(target.path);
+      final clearBytes = await File(image.path).readAsBytes();
+      await target.writeAsBytes(await _vault.encrypt(clearBytes), flush: true);
       if (mounted) setState(() => _pages.add(target));
     } catch (e) {
       _message('Не удалось добавить страницу: $e');
@@ -73,7 +98,18 @@ class _ScannerHomeState extends State<ScannerHome> {
       _busyLabel = 'Распознавание текста…';
     });
     try {
-      final text = await _ocr.recognizeText(file.path);
+      final tempDir = await getTemporaryDirectory();
+      final clearFile = File(
+        '${tempDir.path}/ai_scanner_ocr_${DateTime.now().microsecondsSinceEpoch}.jpg',
+      );
+      final clearBytes = await _readPage(file);
+      await clearFile.writeAsBytes(clearBytes, flush: true);
+      String text;
+      try {
+        text = await _ocr.recognizeText(clearFile.path);
+      } finally {
+        if (await clearFile.exists()) await clearFile.delete();
+      }
       if (!mounted) return;
       await showDialog<void>(
         context: context,
@@ -126,7 +162,7 @@ class _ScannerHomeState extends State<ScannerHome> {
     try {
       final doc = pw.Document();
       for (final file in _pages) {
-        final bytes = await file.readAsBytes();
+        final bytes = await _readPage(file);
         final image = pw.MemoryImage(bytes);
         doc.addPage(
           pw.Page(
@@ -171,7 +207,19 @@ class _ScannerHomeState extends State<ScannerHome> {
           title: const Text('AI Scanner'),
           centerTitle: true,
         ),
-        body: _pages.isEmpty
+        body: !_vaultReady
+            ? Center(
+                child: _vaultError == null
+                    ? const CircularProgressIndicator()
+                    : Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          'Не удалось открыть защищённое хранилище. Перезапустите приложение.\\n$_vaultError',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+              )
+            : _pages.isEmpty
             ? const Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -198,7 +246,25 @@ class _ScannerHomeState extends State<ScannerHome> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.file(_pages[i], fit: BoxFit.cover),
+                      child: FutureBuilder<Uint8List>(
+                        future: _readPage(_pages[i]),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasError) {
+                            return const Center(
+                              child: Icon(Icons.broken_image_outlined),
+                            );
+                          }
+                          if (!snapshot.hasData) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+                          return Image.memory(
+                            snapshot.data!,
+                            fit: BoxFit.cover,
+                          );
+                        },
+                      ),
                     ),
                     Positioned(
                       left: 6,
@@ -243,7 +309,7 @@ class _ScannerHomeState extends State<ScannerHome> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: _busy
+                        onPressed: _busy || !_vaultReady
                             ? null
                             : () => _addPage(ImageSource.camera),
                         icon: const Icon(Icons.camera_alt),
@@ -253,7 +319,7 @@ class _ScannerHomeState extends State<ScannerHome> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: _busy
+                        onPressed: _busy || !_vaultReady
                             ? null
                             : () => _addPage(ImageSource.gallery),
                         icon: const Icon(Icons.photo_library),
@@ -267,7 +333,7 @@ class _ScannerHomeState extends State<ScannerHome> {
                   width: double.infinity,
                   child: FilledButton.icon(
                     onPressed:
-                        _busy || _pages.isEmpty ? null : _exportPdf,
+                        _busy || !_vaultReady || _pages.isEmpty ? null : _exportPdf,
                     icon: const Icon(Icons.picture_as_pdf),
                     label: Text(
                       _busy
