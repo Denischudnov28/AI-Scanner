@@ -862,7 +862,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                                   children: [
                                     Expanded(
                                       child: DropdownButtonFormField<String>(
-                                        value: _activeDocumentId,
+                                        initialValue: _activeDocumentId,
                                         isExpanded: true,
                                         decoration: InputDecoration(
                                           labelText: 'Документ',
