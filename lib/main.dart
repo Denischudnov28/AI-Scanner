@@ -551,33 +551,26 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                                     setState(() => _activeDocumentId = entry.key);
                                     Navigator.pop(sheetContext);
                                   },
-                                  trailing: IconButton(
-                                    tooltip: 'Действия с документом',
-                                    icon: const Icon(Icons.more_vert),
-                                    onPressed: () async {
-                                      final action = await showDialog<String>(
-                                        context: context,
-                                        builder: (dialogContext) => SimpleDialog(
-                                          title: const Text('Действия с документом'),
-                                          children: [
-                                            SimpleDialogOption(
-                                              onPressed: () => Navigator.pop(dialogContext, 'rename'),
-                                              child: const Text('Переименовать'),
-                                            ),
-                                            SimpleDialogOption(
-                                              onPressed: () => Navigator.pop(dialogContext, 'delete'),
-                                              child: const Text('Удалить документ'),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                      if (action == 'rename') {
-                                        await _renameDocument(entry.key);
-                                      } else if (action == 'delete') {
-                                        await _deleteDocument(entry.key);
-                                      }
-                                      if (mounted) refreshSheet(() {});
-                                    },
+                                  trailing: Wrap(
+                                    spacing: 0,
+                                    children: [
+                                      IconButton(
+                                        tooltip: 'Переименовать документ',
+                                        icon: const Icon(Icons.edit_outlined),
+                                        onPressed: () async {
+                                          await _renameDocument(entry.key);
+                                          if (mounted) refreshSheet(() {});
+                                        },
+                                      ),
+                                      IconButton(
+                                        tooltip: 'Удалить документ',
+                                        icon: const Icon(Icons.delete_outline),
+                                        onPressed: () async {
+                                          await _deleteDocument(entry.key);
+                                          if (mounted) refreshSheet(() {});
+                                        },
+                                      ),
+                                    ],
                                   ),
                                 );
                               },
