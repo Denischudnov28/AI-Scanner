@@ -84,7 +84,6 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
   Future<void> _initializeVault() async {
     try {
       await _cleanupTemporaryFiles();
-      await _vault.initialize();
       await _unlockVault();
     } catch (_) {
       if (mounted) {
