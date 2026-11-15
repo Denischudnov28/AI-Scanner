@@ -11,7 +11,7 @@ void main() {
   testWidgets('Settings can be opened from the home screen', (tester) async {
     await tester.pumpWidget(const AiScannerApp());
     await tester.tap(find.byTooltip('Настройки'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Настройки и безопасность'), findsOneWidget);
     expect(find.text('Локальная обработка'), findsOneWidget);
   });
@@ -19,11 +19,11 @@ void main() {
   testWidgets('A named document can be created', (tester) async {
     await tester.pumpWidget(const AiScannerApp());
     await tester.tap(find.byTooltip('Создать документ'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Новый документ'), findsOneWidget);
     await tester.enterText(find.byType(TextField).last, 'Договор аренды');
     await tester.tap(find.text('Создать'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Новый документ'), findsNothing);
   });
 }
