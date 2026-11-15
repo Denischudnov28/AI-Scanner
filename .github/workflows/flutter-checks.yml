@@ -19,6 +19,8 @@ jobs:
           cache: true
       - name: Generate native platform projects
         run: flutter create --platforms=android,ios --project-name ai_scanner .
+      - name: Configure native biometric authentication
+        run: python3 tool/configure_platform_auth.py
       - name: Install dependencies
         run: flutter pub get
       - name: Analyze
@@ -37,6 +39,8 @@ jobs:
           cache: true
       - name: Generate Android project
         run: flutter create --platforms=android --project-name ai_scanner .
+      - name: Configure native biometric authentication
+        run: python3 tool/configure_platform_auth.py
       - name: Install dependencies
         run: flutter pub get
       - name: Build Android APK
@@ -55,6 +59,8 @@ jobs:
           cache: true
       - name: Generate iOS project
         run: flutter create --platforms=ios --project-name ai_scanner .
+      - name: Configure native biometric authentication
+        run: python3 tool/configure_platform_auth.py
       - name: Install dependencies
         run: flutter pub get
       - name: Build iOS simulator app
