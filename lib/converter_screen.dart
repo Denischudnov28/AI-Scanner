@@ -104,24 +104,17 @@ class _ConverterScreenState extends State<ConverterScreen> {
   }
 
   Future<void> _pdfToImages() async {
-    final selection = await FilePicker.platform.pickFiles(
+    final selected = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['pdf'],
-      withData: true,
     );
-    if (selection == null || selection.files.isEmpty) return;
-    final selected = selection.files.single;
-    final bytes = selected.bytes;
-    if (bytes == null || bytes.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось прочитать PDF-файл.')),
-        );
-      }
-      return;
-    }
+    if (selected == null) return;
 
     await _run(() async {
+      final bytes = await selected.readAsBytes();
+      if (bytes.isEmpty) {
+        throw Exception('Не удалось прочитать PDF-файл.');
+      }
       final document = await px.PdfDocument.openData(bytes);
       final outputFiles = <File>[];
       try {
