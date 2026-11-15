@@ -74,11 +74,13 @@ for settings in (root / "android" / "settings.gradle.kts", root / "android" / "s
             repo_start = text.index("repositories {", start)
             insert_at = repo_start + len("repositories {")
             if settings.name.endswith(".kts"):
-                repository = '\n        maven { url = uri("https://jitpack.io") }'
+                repository = '\n            maven { url = uri("https://jitpack.io") }'
             else:
-                repository = "\n        maven { url 'https://jitpack.io' }"
+                repository = "\n            maven { url 'https://jitpack.io' }"
             text = text[:insert_at] + repository + text[insert_at:]
             settings.write_text(text)
+        elif "https://jitpack.io" not in text:
+            raise RuntimeError(f"Could not add JitPack to {settings}: dependencyResolutionManagement.repositories not found")
 
 app_gradle = root / "android" / "app" / "build.gradle.kts"
 if app_gradle.exists():
@@ -86,7 +88,7 @@ if app_gradle.exists():
     if "tesseract4android:tesseract4android" not in text:
         text += (
             '\n\ndependencies {\n'
-            '    implementation("com.github.adaptech-cz.Tesseract4Android:tesseract4android:4.9.0")\n'
+            '    implementation("cz.adaptech.tesseract4android:tesseract4android:4.9.0")\n'
             '}\n'
         )
         app_gradle.write_text(text)
