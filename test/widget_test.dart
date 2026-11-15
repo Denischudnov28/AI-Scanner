@@ -7,7 +7,7 @@ Future<void> createDocument(WidgetTester tester, String name) async {
   await tester.pump(const Duration(milliseconds: 300));
   await tester.enterText(find.byType(TextField).last, name);
   await tester.tap(find.text('Создать'));
-  await tester.pumpAndSettle();
+  await tester.pump(const Duration(milliseconds: 300));
 }
 
 void main() {
@@ -29,7 +29,7 @@ void main() {
     await createDocument(tester, 'Договор аренды');
 
     await tester.tap(find.byTooltip('Мои документы'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Мои документы'), findsOneWidget);
     expect(find.text('Договор аренды'), findsOneWidget);
     expect(find.text('0 страниц'), findsOneWidget);
@@ -46,16 +46,16 @@ void main() {
     await tester.pumpWidget(const AiScannerApp());
     await createDocument(tester, 'Старое название');
     await tester.tap(find.byTooltip('Мои документы'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
     await tester.tap(find.byTooltip('Действия с документом'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('Переименовать'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
     await tester.enterText(find.byType(TextField).last, 'Новое название');
     await tester.tap(find.text('Сохранить'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Новое название'), findsOneWidget);
     expect(find.text('Старое название'), findsNothing);
@@ -66,16 +66,16 @@ void main() {
     await tester.pumpWidget(const AiScannerApp());
     await createDocument(tester, 'Документ для удаления');
     await tester.tap(find.byTooltip('Мои документы'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
     await tester.tap(find.byTooltip('Действия с документом'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('Удалить документ'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Удалить документ?'), findsOneWidget);
     await tester.tap(find.text('Удалить').last);
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Документ для удаления'), findsNothing);
     expect(find.text('Документов пока нет'), findsOneWidget);
