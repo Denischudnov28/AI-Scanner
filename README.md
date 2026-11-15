@@ -9,12 +9,14 @@ Privacy-first document scanner prototype for iPhone and Android.
 - Export pages to a PDF and share it.
 - Run on-device OCR on an individual page and copy the recognized text.
 - Encrypt stored page images locally with AES-256-GCM; keep the encryption key in iOS Keychain / Android Keystore via secure storage.
+- Require Face ID / Touch ID or the device passcode before opening the local vault.
 - OCR uses native on-device frameworks (Apple Vision on iOS and ML Kit on Android); images are not uploaded to a cloud service by this feature.
 
 ## Important limitations
 
 - OCR language accuracy and Russian/Cyrillic recognition must be verified on real iPhone and Android devices before release. The current Flutter plugin exposes native OCR but does not yet provide a language-selection control.
-- Perspective correction, automatic edge detection, document-wide text search, and biometric app lock are not implemented yet.
+- Perspective correction, automatic edge detection, and document-wide text search are not implemented yet.
+- Biometric authentication is configured at app startup; automatic re-locking on every background/foreground transition still needs implementation and device testing.
 - OCR temporarily decrypts a page to an app temporary file; PDF export creates a readable PDF in temporary storage for sharing. These temporary files are not encrypted by the current prototype.
 - This is an early development scaffold, not a production-ready medical-document storage product. Do not store sensitive patient information in this prototype until security review, real-device testing, backup behavior review, and release hardening are complete.
 - No release build or device test has been completed yet.
