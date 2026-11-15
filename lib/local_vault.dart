@@ -91,6 +91,9 @@ class _PlatformVaultKeyStore implements VaultKeyStore {
             accessibility: KeychainAccessibility.first_unlock_this_device,
           ),
           aOptions: AndroidOptions(
+            // Never silently reset a vault key after a Keystore error: that
+            // would make existing encrypted documents permanently unreadable.
+            resetOnError: false,
             // Stage the legacy EncryptedSharedPreferences -> v10 cipher
             // migration with a recoverable backup before biometric storage
             // is enabled in the next upgrade step.
