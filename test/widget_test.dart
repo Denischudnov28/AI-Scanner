@@ -16,6 +16,22 @@ void main() {
     expect(find.text('Локальная обработка'), findsOneWidget);
   });
 
+
+  testWidgets('Document library can be opened', (tester) async {
+    await tester.pumpWidget(const AiScannerApp());
+    await tester.tap(find.byTooltip('Создать документ'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.enterText(find.byType(TextField).last, 'Договор аренды');
+    await tester.tap(find.text('Создать'));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.byTooltip('Мои документы'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Мои документы'), findsOneWidget);
+    expect(find.text('Договор аренды'), findsOneWidget);
+    expect(find.text('0 страниц'), findsOneWidget);
+  });
+
   testWidgets('A named document can be created', (tester) async {
     await tester.pumpWidget(const AiScannerApp());
     await tester.tap(find.byTooltip('Создать документ'));

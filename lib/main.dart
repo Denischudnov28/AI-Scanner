@@ -356,6 +356,191 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
     }
   }
 
+
+  Future<void> _renameDocument(String documentId) async {
+    final controller = TextEditingController(
+      text: _documentTitles[documentId] ?? '',
+    );
+    final title = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Переименовать документ'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 60,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(labelText: 'Название документа'),
+          onSubmitted: (value) => Navigator.pop(dialogContext, value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (title == null || title.trim().isEmpty || !mounted) return;
+    setState(() => _documentTitles[documentId] = title.trim());
+    try {
+      await _persistDocumentIndex();
+    } catch (e) {
+      _message('Не удалось сохранить название: $e');
+    }
+  }
+
+  Future<void> _deleteDocument(String documentId) async {
+    final title = _documentTitles[documentId];
+    if (title == null) return;
+    final pageNames = _pageDocumentIds.entries
+        .where((entry) => entry.value == documentId)
+        .map((entry) => entry.key)
+        .toList();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Удалить документ?'),
+        content: Text(pageNames.isEmpty
+            ? '«$title» будет удалён.'
+            : '«$title» будет удалён. Страницы (${pageNames.length}) сохранятся в другом документе.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _documentTitles.remove(documentId);
+      if (pageNames.isNotEmpty) {
+        final fallbackId = _documentTitles.keys.firstWhere(
+          (id) => id != documentId,
+          orElse: () {
+            final id = DateTime.now().microsecondsSinceEpoch.toString();
+            _documentTitles[id] = 'Мои документы';
+            return id;
+          },
+        );
+        for (final pageName in pageNames) {
+          _pageDocumentIds[pageName] = fallbackId;
+        }
+      }
+      if (_activeDocumentId == documentId) {
+        _activeDocumentId =
+            _documentTitles.isEmpty ? null : _documentTitles.keys.first;
+      }
+    });
+    try {
+      await _persistDocumentIndex();
+    } catch (e) {
+      _message('Не удалось сохранить изменения: $e');
+    }
+  }
+
+  void _showDocuments() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: StatefulBuilder(
+          builder: (context, refreshSheet) {
+            final documents = _documentTitles.entries.toList();
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              child: SizedBox(
+                height: MediaQuery.sizeOf(context).height * 0.68,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(4, 0, 4, 12),
+                      child: Text(
+                        'Мои документы',
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    Expanded(
+                      child: documents.isEmpty
+                          ? const Center(child: Text('Документов пока нет'))
+                          : ListView.separated(
+                              itemCount: documents.length,
+                              separatorBuilder: (_, __) => const Divider(height: 1),
+                              itemBuilder: (context, index) {
+                                final entry = documents[index];
+                                final count = _pageDocumentIds.values
+                                    .where((id) => id == entry.key)
+                                    .length;
+                                return ListTile(
+                                  leading: const CircleAvatar(
+                                    child: Icon(Icons.folder_outlined),
+                                  ),
+                                  title: Text(entry.value),
+                                  subtitle: Text('$count страниц'),
+                                  onTap: () {
+                                    setState(() => _activeDocumentId = entry.key);
+                                    Navigator.pop(sheetContext);
+                                  },
+                                  trailing: PopupMenuButton<String>(
+                                    tooltip: 'Действия с документом',
+                                    onSelected: (action) async {
+                                      if (action == 'rename') {
+                                        await _renameDocument(entry.key);
+                                      } else if (action == 'delete') {
+                                        await _deleteDocument(entry.key);
+                                      }
+                                      if (mounted) refreshSheet(() {});
+                                    },
+                                    itemBuilder: (_) => const [
+                                      PopupMenuItem(
+                                        value: 'rename',
+                                        child: Text('Переименовать'),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'delete',
+                                        child: Text('Удалить документ'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          Navigator.pop(sheetContext);
+                          _createDocument();
+                        },
+                        icon: const Icon(Icons.create_new_folder_outlined),
+                        label: const Text('Создать документ'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _showPage(File file, int pageNumber) async {
     try {
       final bytes = await _readPage(file);
@@ -610,6 +795,11 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
           surfaceTintColor: Colors.transparent,
           toolbarHeight: 82,
           actions: [
+            IconButton(
+              tooltip: 'Мои документы',
+              onPressed: _showDocuments,
+              icon: const Icon(Icons.folder_open_outlined),
+            ),
             IconButton(
               tooltip: 'Создать документ',
               onPressed: _busy ? null : _createDocument,
@@ -889,6 +1079,12 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                                       ),
                                     ),
                                     const SizedBox(width: 8),
+                                    IconButton.filledTonal(
+                                      tooltip: 'Мои документы',
+                                      onPressed: _showDocuments,
+                                      icon: const Icon(Icons.folder_open_outlined),
+                                    ),
+                                    const SizedBox(width: 4),
                                     IconButton.filledTonal(
                                       tooltip: 'Создать документ',
                                       onPressed: _busy ? null : _createDocument,
