@@ -6,4 +6,12 @@ void main() {
     await tester.pumpWidget(const AiScannerApp());
     expect(find.text('AI Scanner'), findsOneWidget);
   });
+
+  testWidgets('Settings can be opened from the home screen', (tester) async {
+    await tester.pumpWidget(const AiScannerApp());
+    await tester.tap(find.byTooltip('Настройки'));
+    await tester.pumpAndSettle();
+    expect(find.text('Настройки и безопасность'), findsOneWidget);
+    expect(find.text('Локальная обработка'), findsOneWidget);
+  });
 }
