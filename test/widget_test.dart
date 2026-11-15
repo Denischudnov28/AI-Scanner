@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 Future<void> pumpApp(WidgetTester tester) async {
   tester.view.physicalSize = const Size(800, 1200);
   tester.view.devicePixelRatio = 1;
-  await pumpApp(tester);
+  await tester.pumpWidget(const AiScannerApp());
 }
 
 Future<void> createDocument(WidgetTester tester, String name) async {
