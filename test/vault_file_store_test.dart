@@ -26,7 +26,10 @@ void main() {
 
     expect(saved.path, endsWith('.aiscan'));
     expect(await saved.readAsBytes(), encrypted);
-    expect(await store.listPages(directory), [saved]);
+    expect(
+      (await store.listPages(directory)).map((file) => file.path),
+      [saved.path],
+    );
     expect(
       directory.listSync().where((entry) => entry.path.endsWith('.pending')),
       isEmpty,
@@ -39,7 +42,10 @@ void main() {
     await complete.writeAsBytes([1, 2, 3]);
     await pending.writeAsBytes([4, 5, 6]);
 
-    expect(await store.listPages(directory), [complete]);
+    expect(
+      (await store.listPages(directory)).map((file) => file.path),
+      [complete.path],
+    );
   });
 
   test('removes abandoned staging files but preserves completed pages', () async {
