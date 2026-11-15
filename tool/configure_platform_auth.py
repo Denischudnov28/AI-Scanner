@@ -46,12 +46,12 @@ if manifest.exists():
         text = text[: close + 1] + "\n    " + permission + text[close + 1 :]
     # Secure-storage encryption keys are device-bound. Prevent Android from
     # restoring encrypted preferences without the matching Keystore key.
-    application = re.search(r"<application\\b[^>]*>", text, flags=re.DOTALL)
+    application = re.search(r"<application\b[^>]*>", text, flags=re.DOTALL)
     if application:
         tag = application.group(0)
-        if re.search(r"android:allowBackup\\s*=", tag):
+        if re.search(r"android:allowBackup\s*=", tag):
             tag = re.sub(
-                r'android:allowBackup\\s*=\\s*"[^"]*"',
+                r'android:allowBackup\s*=\s*"[^"]*"',
                 'android:allowBackup="false"',
                 tag,
             )
@@ -65,7 +65,7 @@ if app_gradle.exists():
     text = app_gradle.read_text()
     # Strict Android Keystore biometric enforcement requires API 28 or newer.
     text = re.sub(
-        r"minSdk\\s*=\\s*flutter\\.minSdkVersion",
+        r"minSdk\s*=\s*flutter\.minSdkVersion",
         "minSdk = 28",
         text,
     )
