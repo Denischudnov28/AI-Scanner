@@ -246,7 +246,17 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
       await clearFile.writeAsBytes(clearBytes, flush: true);
       String text;
       try {
-        text = await _ocr.recognizeText(clearFile.path);
+        if (Platform.isAndroid) {
+          text = await const MethodChannel('ai_scanner/russian_ocr')
+                  .invokeMethod<String>(
+                    'recognizeRussian',
+                    <String, String>{'imagePath': clearFile.path},
+                  ) ??
+              '';
+        } else {
+          // Apple Vision remains the native, on-device OCR engine on iOS.
+          text = await _ocr.recognizeText(clearFile.path);
+        }
       } finally {
         if (await clearFile.exists()) await clearFile.delete();
       }

@@ -9,7 +9,7 @@ Privacy-first document scanner prototype for iPhone and Android.
 - Detect document edges and correct perspective locally during photo import; if detection fails, preserve the original image.
 - Verify AES-GCM encryption, per-file nonce uniqueness, tamper detection, and malformed-key handling with unit tests.
 - Export pages to a PDF and share it.
-- Run on-device OCR on an individual page and copy the recognized text.
+- Run on-device OCR on an individual page and copy the recognized text. Android uses the bundled Russian Tesseract model offline; iOS continues to use Apple Vision.
 - Encrypt stored page images locally with AES-256-GCM; keep the encryption key in iOS Keychain / Android Keystore via secure storage.
 - Require Face ID / Touch ID or the device passcode before opening the local vault.
 - Hide document previews when the app becomes inactive and require re-authentication after it is backgrounded.
@@ -18,12 +18,12 @@ Privacy-first document scanner prototype for iPhone and Android.
 
 ## Important limitations
 
-- OCR accuracy must be verified on real devices. The current plugin does not expose language selection. Its Android ML Kit implementation uses the Latin recognizer by default, so Russian/Cyrillic OCR is not supported on Android in this prototype; a separate offline Cyrillic OCR engine is required. iOS uses Apple Vision, but Russian recognition still needs real-device testing.
+- Russian OCR on Android is implemented with Tesseract4Android and the `rus` model bundled into the APK; it runs locally without a network request. iOS continues to use Apple Vision. OCR quality, memory use, and processing speed still need testing on physical devices and varied document photos.
 - Automatic edge detection and perspective correction run on imported still images; live camera edge tracking, manual corner adjustment, and document-wide text search are not implemented yet.
 - App-switcher privacy masking and re-authentication on background/foreground transitions are implemented in Flutter lifecycle handling but still require real-device testing. iOS does not provide a general guarantee against screenshots taken while the app is actively visible.
 - OCR temporarily decrypts a page to an app temporary file; PDF export creates a readable PDF in temporary storage for sharing. These temporary files are not encrypted by the current prototype.
 - This is an early development scaffold, not a production-ready medical-document storage product. Do not store sensitive patient information in this prototype until security review, real-device testing, backup behavior review, and release hardening are complete.
-- No release build or device test has been completed yet.
+- No signed release build or physical-device test has been completed yet.
 
 ## Build
 

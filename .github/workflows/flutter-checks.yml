@@ -23,7 +23,7 @@ jobs:
           cache: true
       - name: Generate native platform projects
         run: flutter create --platforms=android,ios --project-name ai_scanner .
-      - name: Configure native biometric authentication
+      - name: Configure native biometric authentication and OCR
         run: python3 tool/configure_platform_auth.py
       - name: Install dependencies
         run: flutter pub get
@@ -45,8 +45,14 @@ jobs:
           cache: true
       - name: Generate Android project
         run: flutter create --platforms=android --project-name ai_scanner .
-      - name: Configure native biometric authentication
+      - name: Configure native biometric authentication and OCR
         run: python3 tool/configure_platform_auth.py
+      - name: Add offline Russian OCR model
+        run: |
+          mkdir -p android/app/src/main/assets/tessdata
+          curl --fail --location --retry 3 \
+            https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main/rus.traineddata \
+            --output android/app/src/main/assets/tessdata/rus.traineddata
       - name: Install dependencies
         run: flutter pub get
       - name: Build Android APK
