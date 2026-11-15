@@ -17,6 +17,7 @@ dependencies:
   flutter_native_ocr: ^0.1.0
   cryptography: ^2.7.0
   flutter_secure_storage: ^9.2.4
+  local_auth: ^2.3.0
 
 dev_dependencies:
   flutter_test:
