@@ -70,10 +70,13 @@ if settings.exists():
     text = settings.read_text()
     marker = "dependencyResolutionManagement {"
     if marker in text and "https://jitpack.io" not in text:
-        text = text.replace(
-            "repositories {",
-            'repositories {\n        maven { url = uri("https://jitpack.io") }',
-            1,
+        start = text.index(marker)
+        repo_start = text.index("repositories {", start)
+        insert_at = repo_start + len("repositories {")
+        text = (
+            text[:insert_at]
+            + '\n        maven { url = uri("https://jitpack.io") }'
+            + text[insert_at:]
         )
         settings.write_text(text)
 
@@ -140,7 +143,7 @@ class MainActivity : FlutterFragmentActivity() {
                             ?: throw IllegalArgumentException("Не удалось открыть изображение")
                         try {
                             api.setImage(bitmap)
-                            val recognized = api.utF8Text ?: ""
+                            val recognized = api.getUTF8Text() ?: ""
                             Handler(Looper.getMainLooper()).post { result.success(recognized) }
                         } finally {
                             bitmap.recycle()
