@@ -11,13 +11,11 @@ Future<void> createDocument(WidgetTester tester, String name) async {
 }
 
 Future<void> openDocumentActions(WidgetTester tester) async {
-  final menuButton = find.byType(PopupMenuButton<String>).last;
-  await tester.ensureVisible(menuButton);
+  final actionsButton = find.byTooltip('Действия с документом');
+  await tester.ensureVisible(actionsButton);
   await tester.pump(const Duration(milliseconds: 300));
-  await tester.tap(menuButton);
-  // The document sheet is displayed above an animated home screen; pump the
-  // popup route directly instead of waiting for the whole app to settle.
-  await tester.pump(const Duration(milliseconds: 500));
+  await tester.tap(actionsButton);
+  await tester.pump(const Duration(milliseconds: 300));
 }
 
 void main() {
