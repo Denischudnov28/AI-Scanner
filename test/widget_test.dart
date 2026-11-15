@@ -48,6 +48,8 @@ void main() {
     await tester.tap(find.byTooltip('Мои документы'));
     await tester.pump(const Duration(milliseconds: 300));
 
+    await tester.ensureVisible(find.byTooltip('Действия с документом'));
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byTooltip('Действия с документом'));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('Переименовать'));
@@ -68,6 +70,8 @@ void main() {
     await tester.tap(find.byTooltip('Мои документы'));
     await tester.pump(const Duration(milliseconds: 300));
 
+    await tester.ensureVisible(find.byTooltip('Действия с документом'));
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byTooltip('Действия с документом'));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('Удалить документ'));
