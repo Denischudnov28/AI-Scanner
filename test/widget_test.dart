@@ -57,7 +57,7 @@ void main() {
     final renameButton = find.byWidgetPredicate(
       (widget) => widget is IconButton && widget.tooltip == 'Переименовать документ',
     );
-    tester.widget<IconButton>(renameButton).onPressed!.call();
+    await tester.tap(renameButton);
     await tester.pump(const Duration(milliseconds: 400));
 
     await tester.enterText(find.byType(TextField).last, 'Новое название');
@@ -78,8 +78,8 @@ void main() {
     final deleteButton = find.byWidgetPredicate(
       (widget) => widget is IconButton && widget.tooltip == 'Удалить документ',
     );
-    tester.widget<IconButton>(deleteButton).onPressed!.call();
-    await tester.pumpAndSettle();
+    await tester.tap(deleteButton);
+    await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.text('Удалить документ?'), findsOneWidget);
     await tester.tap(find.text('Удалить').last);
