@@ -40,6 +40,13 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
   final _vault = LocalVault();
   final _fileStore = VaultFileStore();
   final List<File> _pages = [];
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  List<int> get _visiblePageIndexes => List<int>.generate(_pages.length, (i) => i)
+      .where((i) => 'страница ${i + 1} ${_pages[i].uri.pathSegments.last}'
+          .toLowerCase()
+          .contains(_searchQuery.trim().toLowerCase()))
+      .toList();
   bool _vaultReady = false;
   String? _vaultError;
   bool _busy = false;
@@ -57,6 +64,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -221,6 +229,110 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _showPage(File file, int pageNumber) async {
+    try {
+      final bytes = await _readPage(file);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        barrierColor: Colors.black87,
+        builder: (dialogContext) => Dialog.fullscreen(
+          backgroundColor: const Color(0xFF101828),
+          child: Scaffold(
+            backgroundColor: const Color(0xFF101828),
+            appBar: AppBar(
+              backgroundColor: const Color(0xFF101828),
+              foregroundColor: Colors.white,
+              title: Text('Страница $pageNumber'),
+              actions: [
+                IconButton(
+                  tooltip: 'Распознать текст',
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                    _recognizePage(file);
+                  },
+                  icon: const Icon(Icons.text_snippet_outlined),
+                ),
+              ],
+            ),
+            body: Center(
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 5,
+                child: Image.memory(bytes, fit: BoxFit.contain),
+              ),
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      _message('Не удалось открыть страницу: $e');
+    }
+  }
+
+  void _showSettings() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Настройки и безопасность',
+                style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 18),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.lock_outline, color: Color(0xFF2457D6)),
+                title: const Text('Зашифрованное хранилище'),
+                subtitle: Text(_vaultReady
+                    ? 'Разблокировано на этом устройстве'
+                    : 'Сейчас заблокировано'),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.fingerprint, color: Color(0xFF2457D6)),
+                title: const Text('Защита устройства'),
+                subtitle: const Text(
+                  'Доступ к ключу шифрования защищён системной биометрией или кодом устройства.',
+                ),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.phonelink_lock, color: Color(0xFF2457D6)),
+                title: const Text('Локальная обработка'),
+                subtitle: const Text(
+                  'Сканирование и распознавание выполняются на устройстве. Облачная отправка не используется.',
+                ),
+              ),
+              const Divider(),
+              const ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.info_outline),
+                title: Text('AI Scanner'),
+                subtitle: Text('Предварительная версия'),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(sheetContext),
+                  child: const Text('Закрыть'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _recognizePage(File file) async {
     if (_busy) return;
     setState(() {
@@ -366,6 +478,13 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
           backgroundColor: const Color(0xFFF3F5FA),
           surfaceTintColor: Colors.transparent,
           toolbarHeight: 82,
+          actions: [
+            IconButton(
+              tooltip: 'Настройки',
+              onPressed: _showSettings,
+              icon: const Icon(Icons.settings_outlined),
+            ),
+          ],
           title: Row(
             children: [
               Container(
@@ -588,6 +707,57 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                           ),
                         ),
                       if (_pages.isNotEmpty)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Мои страницы',
+                                  style: TextStyle(
+                                    color: Color(0xFF101828),
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                TextField(
+                                  controller: _searchController,
+                                  onChanged: (value) => setState(() => _searchQuery = value),
+                                  decoration: InputDecoration(
+                                    hintText: 'Поиск страниц',
+                                    prefixIcon: const Icon(Icons.search),
+                                    suffixIcon: _searchQuery.isEmpty
+                                        ? null
+                                        : IconButton(
+                                            tooltip: 'Очистить поиск',
+                                            onPressed: () {
+                                              _searchController.clear();
+                                              setState(() => _searchQuery = '');
+                                            },
+                                            icon: const Icon(Icons.close),
+                                          ),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(15),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                  ),
+                                ),
+                                if (_visiblePageIndexes.isEmpty)
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 18),
+                                    child: Center(
+                                      child: Text('Ничего не найдено'),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      if (_pages.isNotEmpty && _visiblePageIndexes.isNotEmpty)
                         SliverPadding(
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
                           sliver: SliverGrid(
@@ -605,7 +775,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(16),
                                     child: FutureBuilder<Uint8List>(
-                                      future: _readPage(_pages[i]),
+                                      future: _readPage(_pages[_visiblePageIndexes[i]]),
                                       builder: (context, snapshot) {
                                         if (snapshot.hasError) {
                                           return const ColoredBox(
@@ -623,9 +793,15 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                                             ),
                                           );
                                         }
-                                        return Image.memory(
-                                          snapshot.data!,
-                                          fit: BoxFit.cover,
+                                        return InkWell(
+                                          onTap: () => _showPage(
+                                            _pages[_visiblePageIndexes[i]],
+                                            _visiblePageIndexes[i] + 1,
+                                          ),
+                                          child: Image.memory(
+                                            snapshot.data!,
+                                            fit: BoxFit.cover,
+                                          ),
                                         );
                                       },
                                     ),
@@ -637,7 +813,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                                       radius: 14,
                                       backgroundColor: Colors.white,
                                       child: Text(
-                                        '${i + 1}',
+                                        '${_visiblePageIndexes[i] + 1}',
                                         style: const TextStyle(
                                           color: Color(0xFF1B356B),
                                           fontWeight: FontWeight.w700,
@@ -650,7 +826,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                                     top: 4,
                                     child: IconButton.filledTonal(
                                       tooltip: 'Удалить страницу',
-                                      onPressed: _busy ? null : () => _removePage(i),
+                                      onPressed: _busy ? null : () => _removePage(_visiblePageIndexes[i]),
                                       icon: const Icon(Icons.close, size: 18),
                                     ),
                                   ),
@@ -661,7 +837,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                                     child: FilledButton.tonalIcon(
                                       onPressed: _busy
                                           ? null
-                                          : () => _recognizePage(_pages[i]),
+                                          : () => _recognizePage(_pages[_visiblePageIndexes[i]]),
                                       icon: const Icon(
                                         Icons.text_snippet_outlined,
                                         size: 18,
@@ -674,7 +850,7 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                                   ),
                                 ],
                               ),
-                              childCount: _pages.length,
+                              childCount: _visiblePageIndexes.length,
                             ),
                           ),
                         ),
