@@ -16,7 +16,7 @@ Privacy-first document scanner prototype for iPhone and Android.
 
 ## Important limitations
 
-- OCR language accuracy and Russian/Cyrillic recognition must be verified on real iPhone and Android devices before release. The current Flutter plugin exposes native OCR but does not yet provide a language-selection control.
+- OCR accuracy must be verified on real devices. The current plugin does not expose language selection. Its Android ML Kit implementation uses the Latin recognizer by default, so Russian/Cyrillic OCR is not supported on Android in this prototype; a separate offline Cyrillic OCR engine is required. iOS uses Apple Vision, but Russian recognition still needs real-device testing.
 - Perspective correction, automatic edge detection, and document-wide text search are not implemented yet.
 - App-switcher privacy masking and re-authentication on background/foreground transitions are implemented in Flutter lifecycle handling but still require real-device testing. iOS does not provide a general guarantee against screenshots taken while the app is actively visible.
 - OCR temporarily decrypts a page to an app temporary file; PDF export creates a readable PDF in temporary storage for sharing. These temporary files are not encrypted by the current prototype.
