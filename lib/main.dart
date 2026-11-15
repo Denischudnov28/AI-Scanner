@@ -796,6 +796,11 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
           toolbarHeight: 82,
           actions: [
             IconButton(
+              tooltip: 'Мои документы',
+              onPressed: _showDocuments,
+              icon: const Icon(Icons.folder_open_outlined),
+            ),
+            IconButton(
               tooltip: 'Создать документ',
               onPressed: _busy ? null : _createDocument,
               icon: const Icon(Icons.create_new_folder_outlined),
