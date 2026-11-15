@@ -551,9 +551,26 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                                     setState(() => _activeDocumentId = entry.key);
                                     Navigator.pop(sheetContext);
                                   },
-                                  trailing: PopupMenuButton<String>(
+                                  trailing: IconButton(
                                     tooltip: 'Действия с документом',
-                                    onSelected: (action) async {
+                                    icon: const Icon(Icons.more_vert),
+                                    onPressed: () async {
+                                      final action = await showDialog<String>(
+                                        context: context,
+                                        builder: (dialogContext) => SimpleDialog(
+                                          title: const Text('Действия с документом'),
+                                          children: [
+                                            SimpleDialogOption(
+                                              onPressed: () => Navigator.pop(dialogContext, 'rename'),
+                                              child: const Text('Переименовать'),
+                                            ),
+                                            SimpleDialogOption(
+                                              onPressed: () => Navigator.pop(dialogContext, 'delete'),
+                                              child: const Text('Удалить документ'),
+                                            ),
+                                          ],
+                                        ),
+                                      );
                                       if (action == 'rename') {
                                         await _renameDocument(entry.key);
                                       } else if (action == 'delete') {
@@ -561,16 +578,6 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
                                       }
                                       if (mounted) refreshSheet(() {});
                                     },
-                                    itemBuilder: (_) => const [
-                                      PopupMenuItem(
-                                        value: 'rename',
-                                        child: Text('Переименовать'),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'delete',
-                                        child: Text('Удалить документ'),
-                                      ),
-                                    ],
                                   ),
                                 );
                               },
