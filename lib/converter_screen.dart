@@ -126,6 +126,7 @@ class _ConverterScreenState extends State<ConverterScreen> {
         final baseName = selected.name.replaceFirst(
           RegExp(r'\.pdf$', caseSensitive: false),
           '',
+        );
         for (var pageNumber = 1; pageNumber <= document.pagesCount; pageNumber++) {
           final page = await document.getPage(pageNumber);
           try {
