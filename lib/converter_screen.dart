@@ -17,6 +17,11 @@ class ConverterScreen extends StatefulWidget {
 }
 
 class _ConverterScreenState extends State<ConverterScreen> {
+  static const int _maxImageCount = 30;
+  static const int _maxSingleImageBytes = 20 * 1024 * 1024;
+  static const int _maxTotalImageBytes = 80 * 1024 * 1024;
+  static const int _maxPdfBytes = 100 * 1024 * 1024;
+
   bool _busy = false;
   String? _status;
 
@@ -44,6 +49,12 @@ class _ConverterScreenState extends State<ConverterScreen> {
     }
   }
 
+  void _showLimitError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
   Future<Directory> _temporaryDirectory() async {
     final directory = await getTemporaryDirectory();
     final output = Directory('${directory.path}/ai_scanner_converter');
@@ -67,11 +78,23 @@ class _ConverterScreenState extends State<ConverterScreen> {
       allowedExtensions: ['jpg', 'jpeg', 'png'],
     );
     if (selection.isEmpty) return;
+    if (selection.length > _maxImageCount) {
+      _showLimitError('Можно выбрать не более $_maxImageCount изображений за раз.');
+      return;
+    }
 
     await _run(() async {
       final document = pw.Document();
       var pageCount = 0;
+      var totalImageBytes = 0;
       for (final selectedFile in selection) {
+        if (selectedFile.size > _maxSingleImageBytes) {
+          throw Exception('Файл ${selectedFile.name} превышает 20 МБ.');
+        }
+        totalImageBytes += selectedFile.size;
+        if (totalImageBytes > _maxTotalImageBytes) {
+          throw Exception('Общий размер изображений не должен превышать 80 МБ.');
+        }
         final bytes = await selectedFile.readAsBytes();
         if (bytes.isEmpty) {
           throw Exception('Не удалось прочитать файл ${selectedFile.name}.');
@@ -93,13 +116,17 @@ class _ConverterScreenState extends State<ConverterScreen> {
       }
       final outputDirectory = await _temporaryDirectory();
       final output = File(
-        '${outputDirectory.path}/images_${DateTime.now().millisecondsSinceEpoch}.pdf',
+        '${outputDirectory.path}/images_${DateTime.now().microsecondsSinceEpoch}.pdf',
       );
-      await output.writeAsBytes(await document.save(), flush: true);
       try {
+        await output.writeAsBytes(await document.save(), flush: true);
         await _shareOutput([output], 'PDF создан локально в AI Scanner');
       } finally {
-        if (await output.exists()) await output.delete();
+        try {
+          if (await output.exists()) await output.delete();
+        } catch (_) {
+          // Best-effort cleanup must not hide the original conversion error.
+        }
       }
     }, 'Создание PDF…');
   }
@@ -110,6 +137,11 @@ class _ConverterScreenState extends State<ConverterScreen> {
       allowedExtensions: ['pdf'],
     );
     if (selected == null) return;
+
+    if (selected.size > _maxPdfBytes) {
+      _showLimitError('Размер PDF не должен превышать 100 МБ.');
+      return;
+    }
 
     await _run(() async {
       final bytes = await selected.readAsBytes();
