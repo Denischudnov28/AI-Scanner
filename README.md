@@ -22,7 +22,7 @@ Privacy-first document scanner prototype for iPhone and Android.
 ## Converter scope and limitations
 
 - The first converter version supports JPG/PNG to PDF and PDF to JPG on iOS and Android. Output is passed to the native share sheet, where it can be saved to Files or shared.
-- PDF-to-image conversion rasterizes each page; selectable text and vector content are not preserved in JPG output. PDF input is limited to 100 pages per operation to control memory use.
+- PDF-to-image conversion rasterizes each page; selectable text and vector content are not preserved in JPG output. PDF input is limited to 100 pages and 100 MB per operation. Image-to-PDF accepts up to 30 images, 20 MB per image, and 80 MB total per operation to reduce memory pressure.
 - DOCX-to-PDF, PDF merging/splitting, and PNG export from PDF are not included in this first version.
 
 ## Important limitations
