@@ -123,10 +123,16 @@ class _ConverterScreenState extends State<ConverterScreen> {
           throw Exception('Для одной операции поддерживается до 100 страниц.');
         }
         final outputDirectory = await _temporaryDirectory();
-        final baseName = selected.name.replaceFirst(
+        final rawBaseName = selected.name.replaceFirst(
           RegExp(r'\.pdf$', caseSensitive: false),
           '',
         );
+        final baseName = rawBaseName
+            .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
+            .replaceAll(RegExp(r'[. ]+$'), '')
+            .trim();
+        final safeBaseName = baseName.isEmpty ? 'document' : baseName;
+        final operationId = DateTime.now().microsecondsSinceEpoch;
         for (var pageNumber = 1; pageNumber <= document.pagesCount; pageNumber++) {
           final page = await document.getPage(pageNumber);
           try {
@@ -142,7 +148,7 @@ class _ConverterScreenState extends State<ConverterScreen> {
               throw Exception('Не удалось обработать страницу $pageNumber.');
             }
             final output = File(
-              '${outputDirectory.path}/${baseName}_page_$pageNumber.jpg',
+              '${outputDirectory.path}/${safeBaseName}_${operationId}_page_$pageNumber.jpg',
             );
             await output.writeAsBytes(rendered.bytes, flush: true);
             outputFiles.add(output);
@@ -150,15 +156,18 @@ class _ConverterScreenState extends State<ConverterScreen> {
             await page.close();
           }
         }
-      } finally {
-        await document.close();
-      }
-
-      try {
         await _shareOutput(outputFiles, 'Страницы PDF преобразованы в JPG');
       } finally {
-        for (final file in outputFiles) {
-          if (await file.exists()) await file.delete();
+        try {
+          await document.close();
+        } finally {
+          for (final file in outputFiles) {
+            try {
+              if (await file.exists()) await file.delete();
+            } catch (_) {
+              // Best-effort cleanup must not hide the original conversion error.
+            }
+          }
         }
       }
     }, 'Преобразование PDF в изображения…');
