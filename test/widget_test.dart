@@ -22,6 +22,20 @@ void main() {
     expect(find.text('AI Scanner'), findsOneWidget);
   });
 
+
+  testWidgets('Converter screen exposes both local conversion options',
+      (tester) async {
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Конвертер'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Конвертер'), findsOneWidget);
+    expect(find.text('Изображения → PDF'), findsOneWidget);
+    expect(find.text('PDF → JPG'), findsOneWidget);
+    expect(find.text('Файлы обрабатываются прямо на устройстве.'), findsOneWidget);
+  });
+
   testWidgets('Settings can be opened from the home screen', (tester) async {
     await pumpApp(tester);
     await tester.tap(find.byTooltip('Настройки'));
