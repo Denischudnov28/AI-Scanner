@@ -50,9 +50,22 @@ class _ConverterScreenState extends State<ConverterScreen> {
   }
 
   void _showLimitError(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  Future<int> _fileLength(PlatformFile file) async {
+    final length = file.lengthSync() ?? await file.length();
+    if (length == null) {
+      throw Exception('Не удалось определить размер файла ${file.name}.');
+    }
+    return length;
+  }
+
+  void _showPickerError(Object error) {
+    _showLimitError('Не удалось открыть файл: $error');
   }
 
   Future<Directory> _temporaryDirectory() async {
@@ -73,29 +86,52 @@ class _ConverterScreenState extends State<ConverterScreen> {
   }
 
   Future<void> _imagesToPdf() async {
-    final selection = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['jpg', 'jpeg', 'png'],
-    );
+    late final List<PlatformFile> selection;
+    try {
+      selection = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png'],
+      );
+    } catch (error) {
+      _showPickerError(error);
+      return;
+    }
     if (selection.isEmpty) return;
     if (selection.length > _maxImageCount) {
       _showLimitError('Можно выбрать не более $_maxImageCount изображений за раз.');
       return;
     }
 
+    final imageSizes = <int>[];
+    var totalImageBytes = 0;
+    try {
+      for (final file in selection) {
+        final size = await _fileLength(file);
+        if (size > _maxSingleImageBytes) {
+          _showLimitError('Файл ${file.name} превышает 20 МБ.');
+          return;
+        }
+        totalImageBytes += size;
+        if (totalImageBytes > _maxTotalImageBytes) {
+          _showLimitError('Общий размер изображений не должен превышать 80 МБ.');
+          return;
+        }
+        imageSizes.add(size);
+      }
+    } catch (error) {
+      _showPickerError(error);
+      return;
+    }
+
     await _run(() async {
       final document = pw.Document();
       var pageCount = 0;
-      var totalImageBytes = 0;
-      for (final selectedFile in selection) {
-        if (selectedFile.size > _maxSingleImageBytes) {
-          throw Exception('Файл ${selectedFile.name} превышает 20 МБ.');
-        }
-        totalImageBytes += selectedFile.size;
-        if (totalImageBytes > _maxTotalImageBytes) {
-          throw Exception('Общий размер изображений не должен превышать 80 МБ.');
-        }
+      for (var index = 0; index < selection.length; index++) {
+        final selectedFile = selection[index];
         final bytes = await selectedFile.readAsBytes();
+        if (bytes.length != imageSizes[index]) {
+          throw Exception('Файл ${selectedFile.name} изменился во время чтения.');
+        }
         if (bytes.isEmpty) {
           throw Exception('Не удалось прочитать файл ${selectedFile.name}.');
         }
@@ -132,19 +168,35 @@ class _ConverterScreenState extends State<ConverterScreen> {
   }
 
   Future<void> _pdfToImages() async {
-    final selected = await FilePicker.pickFile(
-      type: FileType.custom,
-      allowedExtensions: ['pdf'],
-    );
+    late final PlatformFile? selected;
+    try {
+      selected = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+    } catch (error) {
+      _showPickerError(error);
+      return;
+    }
     if (selected == null) return;
 
-    if (selected.size > _maxPdfBytes) {
+    late final int selectedSize;
+    try {
+      selectedSize = await _fileLength(selected);
+    } catch (error) {
+      _showPickerError(error);
+      return;
+    }
+    if (selectedSize > _maxPdfBytes) {
       _showLimitError('Размер PDF не должен превышать 100 МБ.');
       return;
     }
 
     await _run(() async {
       final bytes = await selected.readAsBytes();
+      if (bytes.length != selectedSize) {
+        throw Exception('PDF-файл изменился во время чтения.');
+      }
       if (bytes.isEmpty) {
         throw Exception('Не удалось прочитать PDF-файл.');
       }
