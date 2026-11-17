@@ -179,10 +179,11 @@ class _ConverterScreenState extends State<ConverterScreen> {
       return;
     }
     if (selected == null) return;
+    final selectedPdf = selected;
 
     late final int selectedSize;
     try {
-      selectedSize = await _fileLength(selected);
+      selectedSize = await _fileLength(selectedPdf);
     } catch (error) {
       _showPickerError(error);
       return;
@@ -193,7 +194,7 @@ class _ConverterScreenState extends State<ConverterScreen> {
     }
 
     await _run(() async {
-      final bytes = await selected.readAsBytes();
+      final bytes = await selectedPdf.readAsBytes();
       if (bytes.length != selectedSize) {
         throw Exception('PDF-файл изменился во время чтения.');
       }
@@ -207,7 +208,7 @@ class _ConverterScreenState extends State<ConverterScreen> {
           throw Exception('Для одной операции поддерживается до 100 страниц.');
         }
         final outputDirectory = await _temporaryDirectory();
-        final rawBaseName = selected.name.replaceFirst(
+        final rawBaseName = selectedPdf.name.replaceFirst(
           RegExp(r'\.pdf$', caseSensitive: false),
           '',
         );
