@@ -10,6 +10,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 import 'local_vault.dart';
 import 'vault_file_store.dart';
+import 'converter_screen.dart';
 
 void main() => runApp(const AiScannerApp());
 
@@ -639,6 +640,12 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
     }
   }
 
+  void _showConverter() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const ConverterScreen()),
+    );
+  }
+
   void _showSettings() {
     showModalBottomSheet<void>(
       context: context,
@@ -852,6 +859,11 @@ class _ScannerHomeState extends State<ScannerHome> with WidgetsBindingObserver {
           surfaceTintColor: Colors.transparent,
           toolbarHeight: 82,
           actions: [
+            IconButton(
+              tooltip: 'Конвертер',
+              onPressed: _busy ? null : _showConverter,
+              icon: const Icon(Icons.swap_horiz_rounded),
+            ),
             IconButton(
               tooltip: 'Мои документы',
               onPressed: _showDocuments,
